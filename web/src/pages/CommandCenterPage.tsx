@@ -1,51 +1,46 @@
-/** Command Center — ARIA's operating instrument.
+/**
+ * ARIA Cyber-Financial Mission Control Center.
  *
- * Recomposed (emergency submission pass): NOT a card grid. The living payment
- * network is the protagonist and occupies the majority of the viewport; a right
- * intelligence rail explains it (incident → diagnosis → confidence → evidence →
- * claim), a recovery control strip presents the bounded action as an operational
- * decision, and a causal ribbon (DETECTED → DIAGNOSED → INTERVENTION → RECOVERED)
- * makes the reasoning chain legible at a glance.
- *
- * Composition only: the real <CommandTopology> graph (topology feature) is embedded
- * here, driven by the SAME /api/simulate trace that feeds the intelligence rail.
- * Every value is real API data — nothing hardcoded or fabricated.
+ * Protagonist view featuring:
+ * - Floating glassmorphic HUD dock (ScenarioSelector, Playback, RiskAppetiteDial).
+ * - Living payment network topology canvas with custom hardware chips and particle streams.
+ * - Interactive 20-Window Time-Travel Scrubber.
+ * - Precision intelligence rail with Mathematical Deduction Proof Matrix and bounded Recovery Console.
+ * - Real-time Spring Odometer KPIs.
  */
-import { useState } from "react";
+import * as React from "react";
 import { motion } from "framer-motion";
 import { cn, inr } from "@/design/ui";
-import { useSimulate, useTopology, type SimulateRequest } from "@/lib";
+import { useAppStore, useSimulate, useTopology } from "@/lib";
 import { CommandTopology } from "@/topology";
-import {
-  ConfidenceRing,
-  ErrorState,
-  LoadingState,
-  RecoveryConsole,
-  prettyNodeId,
-  representativeWindow,
-  windowSuccessRate,
-} from "@/incident";
+import { CommandHUD } from "@/components/hud/CommandHUD";
+import { ProofMatrix } from "@/components/telemetry/ProofMatrix";
+import { TimeTravelScrubber } from "@/components/telemetry/TimeTravelScrubber";
+import { OdometerTicker } from "@/components/telemetry/OdometerTicker";
+import { RecoveryConsole } from "@/incident/RecoveryConsole";
+import { ErrorState, LoadingState, prettyNodeId, representativeWindow, windowSuccessRate } from "@/incident";
+import { Badge } from "@/components/ui/badge";
+import { Activity, ArrowUpRight, DollarSign, Layers, ShieldCheck, Sparkles, TrendingUp, Zap } from "lucide-react";
 
-// Opens on the hero / thesis scenario. Real, deterministic, reproducible.
-const DEFAULT_REQ: SimulateRequest = {
-  incident_type: "A_shared_bank",
-  seed: 7,
-  intervention_threshold: 0.7,
-  system: "ariadne",
-};
+import { ExecutiveVerdictBanner } from "@/components/verdict/ExecutiveVerdictBanner";
+import { ExecutiveView } from "@/components/verdict/ExecutiveView";
+import { StorytellerPill } from "@/components/storyteller/StorytellerPill";
 
 export function CommandCenterPage() {
-  const [req] = useState<SimulateRequest>(DEFAULT_REQ);
+  const { scenario, customTopology, selectedWindow, viewLens } = useAppStore();
   const topo = useTopology();
-  const sim = useSimulate(req, topo.isSuccess);
+  const sim = useSimulate(scenario, topo.isSuccess);
 
-  if (topo.isLoading || sim.isLoading) return <LoadingState label="Bringing the payment network online…" />;
+  if (topo.isLoading || sim.isLoading) {
+    return <LoadingState label="Initializing Cyber-Financial Mission Control Plane…" />;
+  }
   if (topo.error) return <ErrorState error={topo.error} onRetry={() => topo.refetch()} />;
   if (sim.error) return <ErrorState error={sim.error} onRetry={() => sim.refetch()} />;
-  if (!topo.data || !sim.data) return <LoadingState label="Loading command center…" />;
+  if (!topo.data || !sim.data) return <LoadingState label="Synchronizing telemetry telemetry feeds…" />;
 
+  const topologyData = customTopology || topo.data;
   const res = sim.data;
-  const rep = representativeWindow(res);
+  const rep = res.windows[selectedWindow] || representativeWindow(res);
   const attr = res.attribution;
   const action = res.action;
   const doNothing = action.kind === "do_nothing";
@@ -54,145 +49,155 @@ export function CommandCenterPage() {
   const incidentActive = rep.detection.dropped_nodes.length > 0;
 
   return (
-    <div className="flex h-full flex-col bg-bg-base">
-      {/* ── quiet global header ───────────────────────────────────────── */}
-      <div className="flex items-center justify-between border-b border-border-subtle px-6 py-3">
-        <div className="flex items-baseline gap-3">
-          <h1 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-text-secondary">
-            Command
-          </h1>
-          <span className="tabular text-[11px] text-text-muted">
-            {res.incident.incident_type} · seed {req.seed} · τ{req.intervention_threshold.toFixed(2)}
-          </span>
-        </div>
-        <div className="flex items-center gap-4">
-          <span className="tabular text-[11px] text-text-muted">
-            window {rep.window}/{res.incident.n_windows}
-          </span>
-          <span className="flex items-center gap-1.5">
-            <span className={cn("h-1.5 w-1.5 rounded-full", incidentActive ? "bg-down" : "bg-healthy")} />
-            <span className="text-[11px] font-medium text-text-secondary">
-              {incidentActive ? "incident active" : "nominal"}
-            </span>
-          </span>
-        </div>
+    <div className="flex h-full flex-col bg-bg-base overflow-hidden relative">
+      {/* Floating Top Control HUD */}
+      <div className="px-5 pt-3.5 pb-2 shrink-0 z-20">
+        <CommandHUD />
       </div>
 
-      {/* ── metric readout (baseline-aligned figures, NOT tiles) ──────── */}
-      <div className="flex items-stretch gap-8 border-b border-border-subtle px-6 py-3">
-        <Kpi label="Recovered" value={inr(res.money_recovered)} tone={negative ? "down" : "healthy"} sub="counterfactual" />
-        <Kpi label="Expected" value={inr(action.expected_recovery)} sub="estimate" />
-        <Kpi label="Success" value={`${(successRate * 100).toFixed(1)}%`} tone={successRate < 0.9 ? "degraded" : "default"} sub={`window ${rep.window}`} />
-        <Kpi label="Incident" value={res.incident.incident_type.split("_")[0]} tone={incidentActive ? "down" : "default"} sub={res.incident.target_id ?? "—"} />
+      {/* 3-Second Executive Verdict & Operational Summary */}
+      <div className="px-5 pb-2 shrink-0 z-10">
+        <ExecutiveVerdictBanner />
       </div>
 
-      {/* ── instrument body: network (protagonist) + reasoning rail ───── */}
-      <div className="flex min-h-0 flex-1">
-        {/* PRIMARY: living payment network */}
-        <section className="relative min-w-0 flex-1" aria-label="Living payment network">
-          <div className="pointer-events-none absolute left-5 top-4 z-10 flex items-center gap-2.5">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">
-              Payment network
-            </span>
-            <span className="h-3 w-px bg-border-strong" />
-            <span className="text-[10px] uppercase tracking-wide text-info">Bank-A · shared dependency</span>
-          </div>
-          <CommandTopology topology={topo.data} sim={res} />
-        </section>
-
-        {/* RIGHT REASONING RAIL — an operational readout, hairline-divided ── */}
-        <aside className="flex w-[360px] shrink-0 flex-col overflow-y-auto border-l border-border-subtle bg-bg-inset" aria-label="Diagnosis readout">
-          <RailBlock label="Incident">
-            <div className="flex items-center justify-between">
-              <span className="text-[15px] font-semibold tracking-tight text-text-primary">
-                {res.incident.target_id ? prettyNodeId(res.incident.target_id) : "—"} degradation
-              </span>
-              <span className="tabular text-[11px] text-down">{res.incident.incident_type.split("_")[0]}</span>
-            </div>
-            <p className="tabular mt-1 text-[11px] text-text-muted">
-              windows {res.incident.start_window}–{res.incident.end_window} · {rep.detection.dropped_nodes.length} node(s) breached
-            </p>
-          </RailBlock>
-
-          <RailBlock label="Diagnosis">
-            <div className="flex items-center gap-4">
-              <ConfidenceRing value={attr.confidence} size={72} label="conf" />
-              <div className="min-w-0">
-                <div className="text-[10px] uppercase tracking-wide text-text-muted">root cause</div>
-                <div className="truncate text-xl font-semibold tracking-tight text-text-primary">
-                  {attr.root_cause_kind === "none" ? "No single cause" : prettyNodeId(attr.root_cause_id)}
+      {viewLens === "executive" ? (
+        /* Executive Persona Lens: Clear Financial Defense Narrative & Routing Architecture */
+        <div className="flex-1 min-h-0 px-5 flex flex-col overflow-hidden">
+          <ExecutiveView sim={res} topology={topologyData} />
+        </div>
+      ) : (
+        /* Forensic Persona Lens: Deep Telemetry Canvas, Proof Matrix & Time Analyzer */
+        <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
+          {/* Top Telemetry KPI Bar */}
+          <div id="tour-kpis" className="grid grid-cols-2 md:grid-cols-4 gap-3 px-5 py-2 shrink-0">
+            {/* KPI 1: Recovered Revenue */}
+            <div className="doppelrand rounded-2xl">
+              <div className="doppelrand-inner p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-3xs uppercase font-semibold tracking-wider text-text-muted flex items-center gap-1">
+                    <DollarSign className="h-3 w-3 text-status-healthy" /> Realized Recovery
+                  </div>
+                  <div
+                    className={cn(
+                      "font-mono text-xl font-extrabold tracking-tight mt-0.5",
+                      negative
+                        ? "text-status-down"
+                        : "bg-gradient-to-r from-emerald-400 via-teal-300 to-emerald-200 bg-clip-text text-transparent drop-shadow-[0_0_12px_rgba(16,185,129,0.3)]"
+                    )}
+                  >
+                    <OdometerTicker value={inr(res.money_recovered)} />
+                  </div>
                 </div>
-                <div className="mt-1.5 flex items-center gap-2 text-[11px]">
-                  <span className="text-text-muted">kind</span>
-                  <span className={cn("tabular font-medium", attr.root_cause_kind === "bank" ? "text-down" : "text-text-secondary")}>
-                    {attr.root_cause_kind}
-                  </span>
-                  <span className="text-border-strong">·</span>
-                  <span className="text-text-muted">claim</span>
-                  <span className="tabular font-medium text-info">{attr.claim_type}</span>
+                <Badge variant={negative ? "down" : "healthy"} className="text-3xs font-mono">
+                  Counterfactual
+                </Badge>
+              </div>
+            </div>
+
+            {/* KPI 2: Expected Recovery */}
+            <div className="doppelrand rounded-2xl">
+              <div className="doppelrand-inner p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-3xs uppercase font-semibold tracking-wider text-text-muted flex items-center gap-1">
+                    <TrendingUp className="h-3 w-3 text-accent" /> Expected Yield
+                  </div>
+                  <div className="font-mono text-xl font-extrabold text-text-primary tracking-tight mt-0.5">
+                    <OdometerTicker value={inr(action.expected_recovery)} />
+                  </div>
+                </div>
+                <Badge variant="secondary" className="text-3xs font-mono">
+                  Policy Estimate
+                </Badge>
+              </div>
+            </div>
+
+            {/* KPI 3: Window Success Rate */}
+            <div className="doppelrand rounded-2xl">
+              <div className="doppelrand-inner p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-3xs uppercase font-semibold tracking-wider text-text-muted flex items-center gap-1">
+                    <Activity className="h-3 w-3 text-status-info" /> Success Rate
+                  </div>
+                  <div
+                    className={cn(
+                      "font-mono text-xl font-extrabold tracking-tight mt-0.5",
+                      successRate < 0.9 ? "text-status-down" : "text-status-healthy"
+                    )}
+                  >
+                    <OdometerTicker value={`${(successRate * 100).toFixed(1)}%`} />
+                  </div>
+                </div>
+                <span className="font-mono text-3xs text-text-muted">Window {rep.window}</span>
+              </div>
+            </div>
+
+            {/* KPI 4: Active Fault State */}
+            <div className="doppelrand rounded-2xl">
+              <div className="doppelrand-inner p-3 flex items-center justify-between">
+                <div>
+                  <div className="text-3xs uppercase font-semibold tracking-wider text-text-muted flex items-center gap-1">
+                    <Zap className="h-3 w-3 text-status-degraded" /> Fault Target
+                  </div>
+                  <div className="text-base font-bold text-white tracking-tight mt-0.5 truncate max-w-[140px]">
+                    {res.incident.target_id ? prettyNodeId(res.incident.target_id) : "None (Nominal)"}
+                  </div>
+                </div>
+                <Badge variant={incidentActive ? "down" : "healthy"} className="text-3xs font-mono uppercase">
+                  {incidentActive ? "Breach Active" : "Nominal"}
+                </Badge>
+              </div>
+            </div>
+          </div>
+
+          {/* Main Workspace Body: Living Network (Center) + Intelligence Rail (Right) */}
+          <div className="flex min-h-0 flex-1 px-5 pb-3 gap-4">
+            {/* Living Payment Network (Protagonist Canvas) */}
+            <div id="tour-topology" className="relative flex-1 flex flex-col min-w-0 rounded-2xl overflow-hidden border border-white/[0.08] shadow-2xl">
+              {/* Floating Storyteller Pill with Live Narrative Commentary */}
+              <div className="p-2 z-10 bg-black/60 backdrop-blur-xl border-b border-white/[0.06]">
+                <StorytellerPill />
+              </div>
+
+              <div className="flex-1 min-h-0 relative">
+                <CommandTopology topology={topologyData} sim={res} />
+              </div>
+
+              {/* Integrated Time-Travel Scrubber */}
+              <div id="tour-scrubber" className="p-2 shrink-0 bg-black/60 backdrop-blur-xl border-t border-white/[0.06]">
+                <TimeTravelScrubber />
+              </div>
+            </div>
+
+            {/* Right Intelligence & Deduction Rail */}
+            <div className="w-[380px] shrink-0 flex flex-col gap-3 overflow-y-auto pr-1">
+              {/* Visual Deduction Matrix */}
+              <div id="tour-proof">
+                <ProofMatrix />
+              </div>
+
+              {/* Bounded Recovery Console */}
+              <div id="tour-recovery" className="doppelrand rounded-2xl">
+                <div className="doppelrand-inner">
+                  <RecoveryConsole action={action} moneyRecovered={res.money_recovered} />
                 </div>
               </div>
             </div>
-          </RailBlock>
-
-          <RailBlock label="Evidence">
-            <ol className="space-y-1.5">
-              {attr.evidence_path.map((line, i) => (
-                <li key={i} className="flex gap-2 text-[11px] leading-snug">
-                  <span className="tabular shrink-0 text-text-muted">{String(i + 1).padStart(2, "0")}</span>
-                  <span className={cn("tabular", i === attr.evidence_path.length - 1 ? "text-text-primary" : "text-text-secondary")}>{line}</span>
-                </li>
-              ))}
-            </ol>
-          </RailBlock>
-
-          <div className="flex-1 border-t border-border-subtle">
-            <RecoveryConsole action={action} moneyRecovered={res.money_recovered} />
           </div>
-        </aside>
-      </div>
 
-      {/* ── causal sequence: DETECTED → DIAGNOSED → INTERVENTION → RECOVERED ── */}
-      <CausalRibbon
-        detected={incidentActive}
-        diagnosed={attr.root_cause_kind !== "none"}
-        intervened={!doNothing}
-        recovered={res.money_recovered !== 0}
-        money={res.money_recovered}
-        action={action.kind}
-        negative={negative}
-      />
-    </div>
-  );
-}
-
-function Kpi({
-  label,
-  value,
-  tone = "default",
-  sub,
-}: {
-  label: string;
-  value: React.ReactNode;
-  tone?: "healthy" | "degraded" | "down" | "default";
-  sub?: string;
-}) {
-  const color =
-    tone === "healthy" ? "text-healthy" : tone === "degraded" ? "text-degraded" : tone === "down" ? "text-down" : "text-text-primary";
-  return (
-    <div className="flex flex-col justify-center">
-      <div className="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">{label}</div>
-      <div className={cn("tnum text-[19px] font-semibold leading-tight tracking-tight", color)}>{value}</div>
-      {sub && <div className="tabular text-[10px] text-text-muted">{sub}</div>}
-    </div>
-  );
-}
-
-function RailBlock({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="border-b border-border-subtle px-5 py-4">
-      <div className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">{label}</div>
-      {children}
+          {/* Bottom Causal Sequence Ribbon */}
+          <div className="shrink-0 border-t border-white/[0.06] bg-[#07080C]/95 px-5 py-2.5">
+            <CausalRibbon
+              detected={incidentActive}
+              diagnosed={attr.root_cause_kind !== "none"}
+              intervened={!doNothing}
+              recovered={res.money_recovered !== 0}
+              money={res.money_recovered}
+              action={action.kind}
+              negative={negative}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -215,32 +220,41 @@ function CausalRibbon({
   negative: boolean;
 }) {
   const steps = [
-    { key: "detected", label: "Detected", done: detected, detail: detected ? "degradation observed" : "monitoring" },
-    { key: "diagnosed", label: "Diagnosed", done: diagnosed, detail: diagnosed ? "root cause attributed" : "—" },
-    { key: "intervention", label: "Intervention", done: intervened, detail: intervened ? action : "do nothing" },
-    { key: "recovered", label: "Recovered", done: recovered, detail: recovered ? inr(money) : "—", tone: negative ? "down" : "healthy" },
+    { key: "detected", label: "Telemetry Detection", done: detected, detail: detected ? "Anomalous Delta Breach" : "Monitoring Baseline" },
+    { key: "diagnosed", label: "Causal Graph Inference", done: diagnosed, detail: diagnosed ? "Shared Root Cause Isolated" : "No Dependency Fault" },
+    { key: "intervention", label: "Policy Execution", done: intervened, detail: intervened ? action.replace(/_/g, " ") : "Hold Standby" },
+    { key: "recovered", label: "Yield Realization", done: recovered, detail: recovered ? inr(money) : "0", tone: negative ? "down" : "healthy" },
   ] as const;
+
   return (
-    <div className="flex items-stretch border-t border-border-subtle bg-bg-surface">
+    <div className="grid grid-cols-4 gap-3">
       {steps.map((s, i) => (
-        <div key={s.key} className={cn("flex flex-1 items-center gap-3 px-5 py-3", i > 0 && "border-l border-border-subtle")}>
-          <motion.span
-            initial={{ scale: 0.8, opacity: 0.4 }}
-            animate={{ scale: s.done ? 1 : 0.8, opacity: s.done ? 1 : 0.4 }}
+        <div
+          key={s.key}
+          className={cn(
+            "flex items-center gap-2.5 rounded-xl border p-2 transition-all duration-300",
+            s.done
+              ? "bg-white/[0.03] border-white/[0.1] shadow-inner-specular"
+              : "border-white/[0.04] bg-white/[0.01] opacity-50"
+          )}
+        >
+          <span
             className={cn(
-              "flex h-6 w-6 items-center justify-center rounded-full border text-2xs font-semibold",
+              "flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border text-2xs font-mono font-bold transition-all",
               s.done
-                ? (s as { tone?: string }).tone === "down"
-                  ? "border-down text-down"
-                  : "border-healthy text-healthy"
-                : "border-border-strong text-text-muted"
+                ? "border-accent/60 bg-accent/20 text-accent shadow-[0_0_10px_rgba(99,102,241,0.4)]"
+                : "border-white/[0.1] bg-white/[0.02] text-text-muted"
             )}
           >
-            {i + 1}
-          </motion.span>
+            0{i + 1}
+          </span>
           <div className="min-w-0">
-            <div className={cn("text-2xs font-semibold uppercase tracking-wide", s.done ? "text-text-secondary" : "text-text-muted")}>{s.label}</div>
-            <div className={cn("tnum truncate text-xs", s.done ? "text-text-primary" : "text-text-muted")}>{s.detail}</div>
+            <div className="text-3xs font-semibold uppercase tracking-wider text-text-muted">
+              {s.label}
+            </div>
+            <div className="truncate font-mono text-xs font-semibold text-text-primary capitalize">
+              {s.detail}
+            </div>
           </div>
         </div>
       ))}

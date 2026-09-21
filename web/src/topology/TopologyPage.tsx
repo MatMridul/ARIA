@@ -1,154 +1,133 @@
 /**
- * <TopologyPage> — the default topology surface: the living payment graph +
- * scenario controls + a diagnosis side panel.
+ * <TopologyPage> — Living cybernetic payment dependency graph surface.
  *
- * Story staging over the incident window span (drives what the graph shows):
- *   before detection triggers          -> healthy graph, traffic flowing
- *   during the incident, once detected -> affected PSPs degrade/pulse, and the
- *                                         attribution highlights the evidence
- *                                         path converging onto the shared bank
- *   after diagnosis, if action=reroute -> the reroute target PSP + its edges
- *                                         light up (traffic moved to health)
- * Node/edge health for every window is DERIVED client-side (see deriveHealth.ts);
- * bank health in particular is inferred from its PSPs' deltas, never an API row.
+ * Full-bleed cybernetic viewport with:
+ * - Floating top CommandHUD dock.
+ * - Hardware Doppelrand nodes with multi-ring distress shockwave radars.
+ * - Glowing laser particle streams with reroute bursts.
+ * - Integrated 20-Window Time-Travel Scrubber.
+ * - Interactive slide-over deep-dive inspection drawer on node click.
  */
-import { useMemo, useState } from "react";
+import * as React from "react";
+import { useMemo } from "react";
 import { Badge, Button, Card, CardHeader } from "@/design/ui";
-import { useSimulate, useTopology, type IncidentTypeId } from "@/lib";
+import { useAppStore, useSimulate, useTopology } from "@/lib";
 import { PaymentGraph } from "./PaymentGraph";
-import { ScenarioControls, type ScenarioState } from "./ScenarioControls";
 import { SidePanel } from "./SidePanel";
 import { buildGraph } from "./buildGraph";
-import { useScenarioPlayback } from "./useScenarioPlayback";
-
-const DEFAULT_SCENARIO: ScenarioState = {
-  incident: "A_shared_bank" as IncidentTypeId,
-  seed: 7,
-  system: "ariadne",
-};
-const THRESHOLD = 0.7;
-
-function CenterCard({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="grid h-full place-items-center p-8">
-      <Card className="max-w-md">
-        <CardHeader title={title} />
-        <div className="p-6 text-sm text-text-secondary">{children}</div>
-      </Card>
-    </div>
-  );
-}
+import { CommandHUD } from "@/components/hud/CommandHUD";
+import { TimeTravelScrubber } from "@/components/telemetry/TimeTravelScrubber";
+import { Dna, Network, ShieldCheck, Sparkles } from "lucide-react";
 
 export function TopologyPage() {
-  const [scenario, setScenario] = useState<ScenarioState>(DEFAULT_SCENARIO);
+  const { scenario, customTopology, selectedWindow } = useAppStore();
 
   const topo = useTopology();
-  const sim = useSimulate(
-    {
-      incident_type: scenario.incident,
-      seed: scenario.seed,
-      intervention_threshold: THRESHOLD,
-      system: scenario.system,
-    },
-    // only fetch once the topology exists
-    topo.isSuccess
-  );
+  const sim = useSimulate(scenario, topo.isSuccess);
 
   const windows = sim.data?.windows ?? [];
-  const playback = useScenarioPlayback(windows.length);
-  const win = windows[playback.index];
+  const currentWindowIdx = Math.min(selectedWindow, Math.max(0, windows.length - 1));
+  const win = windows[currentWindowIdx];
 
   // Has the incident been diagnosed at/through the current window?
-  // We reveal attribution once detection has triggered on this or an earlier
-  // window (the story "converges" as you scrub forward).
   const diagnosed = useMemo(() => {
     if (!sim.data) return false;
-    for (let i = 0; i <= playback.index && i < windows.length; i++) {
-      if (windows[i]?.detection.triggered) return true;
+    for (let i = 0; i <= currentWindowIdx && i < windows.length; i++) {
+      if (windows[i]?.detection?.triggered) return true;
     }
     return false;
-  }, [sim.data, windows, playback.index]);
+  }, [sim.data, windows, currentWindowIdx]);
 
   const attribution = diagnosed ? sim.data?.attribution : undefined;
 
-  // Reroute target only appears in the last third of the trace (post-recovery),
-  // and only when the chosen action actually rerouted traffic.
+  // Reroute target PSP if action is reroute and past the recovery window
   const rerouteToPsp = useMemo(() => {
     if (!sim.data || !diagnosed) return undefined;
     const act = sim.data.action;
     if (act.kind !== "reroute") return undefined;
-    const past2of3 = playback.index >= Math.floor((windows.length * 2) / 3);
+    const past2of3 = currentWindowIdx >= Math.floor((windows.length * 2) / 3);
     if (!past2of3) return undefined;
     const to = act.params["to_psp"];
     return typeof to === "string" ? to : undefined;
-  }, [sim.data, diagnosed, playback.index, windows.length]);
+  }, [sim.data, diagnosed, currentWindowIdx, windows.length]);
+
+  const topologyData = customTopology || topo.data;
 
   const graph = useMemo(() => {
-    if (!topo.data) return { nodes: [], edges: [] };
+    if (!topologyData) return { nodes: [], edges: [] };
     return buildGraph({
-      topology: topo.data,
+      topology: topologyData,
       win,
+      windows,
       attribution,
       rerouteToPsp,
     });
-  }, [topo.data, win, attribution, rerouteToPsp]);
+  }, [topologyData, win, windows, attribution, rerouteToPsp]);
 
-  // ---- loading / error states for the topology query ------------------------
   if (topo.isLoading) {
     return (
-      <CenterCard title="Loading topology…">
-        <div className="flex items-center gap-2">
-          <span className="h-2 w-2 animate-ping rounded-full bg-accent" />
-          Fetching the payment dependency graph.
+      <div className="grid h-full place-items-center bg-bg-base p-8">
+        <div className="flex flex-col items-center gap-3">
+          <span className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent" />
+          <span className="text-xs font-mono text-text-muted">Synthesizing payment topology lattice…</span>
         </div>
-      </CenterCard>
+      </div>
     );
   }
-  if (topo.isError) {
+
+  if (topo.isError || !topologyData) {
     return (
-      <CenterCard title="Could not load topology">
-        <p className="text-down">{(topo.error as Error)?.message ?? "Unknown error."}</p>
-        <Button variant="secondary" className="mt-4" onClick={() => topo.refetch()}>
-          Retry
-        </Button>
-      </CenterCard>
+      <div className="grid h-full place-items-center bg-bg-base p-8">
+        <Card className="max-w-md p-6 text-center space-y-4">
+          <h3 className="text-sm font-bold text-status-down">Topology Initialization Failed</h3>
+          <p className="text-xs text-text-secondary">{(topo.error as Error)?.message ?? "Unable to fetch payment nodes."}</p>
+          <Button variant="default" onClick={() => topo.refetch()}>
+            Retry Connection
+          </Button>
+        </Card>
+      </div>
     );
-  }
-  if (!topo.data || topo.data.psps.length === 0) {
-    return <CenterCard title="No topology">The graph is empty — nothing to render.</CenterCard>;
   }
 
   return (
-    <div className="flex h-[calc(100vh-3.5rem)] flex-col">
-      <ScenarioControls
-        state={scenario}
-        onChange={setScenario}
-        playback={playback}
-        loading={sim.isFetching}
-      />
-
-      {/* thesis banner for the hero scenario */}
-      {scenario.incident === "A_shared_bank" && (
-        <div className="flex items-center gap-2 border-b border-border-subtle bg-bg-surface/60 px-4 py-1.5 text-2xs text-text-muted">
-          <Badge tone="info">thesis</Badge>
-          When <span className="text-text-secondary">Bank-A</span> fails, PSP-1 and PSP-2 both
-          breach and converge on one hidden node — ARIA sees{" "}
-          <span className="text-text-primary">one bank down</span>, a graph-blind monitor sees two
-          independent PSP faults.
+    <div className="flex h-full flex-col bg-bg-base overflow-hidden relative">
+      {/* Floating Glass HUD Dock */}
+      <div className="absolute top-4 left-5 right-5 z-20 pointer-events-none">
+        <div className="pointer-events-auto">
+          <CommandHUD />
         </div>
-      )}
+      </div>
 
-      <div className="flex min-h-0 flex-1">
+      {/* Main Canvas & Side Intelligence Panel */}
+      <div className="flex min-h-0 flex-1 relative">
         <div className="relative min-w-0 flex-1">
-          {sim.isError && (
-            <div className="absolute inset-x-0 top-0 z-20 bg-down/15 px-4 py-2 text-2xs text-down">
-              Simulation failed: {(sim.error as Error)?.message ?? "unknown error"} — the graph
-              shows the static topology.
+          {scenario.incident_type === "A_shared_bank" && (
+            <div className="absolute top-20 left-6 z-10 pointer-events-none">
+              <div className="flex items-center gap-2 rounded-xl border border-white/[0.08] bg-black/70 px-3 py-1.5 backdrop-blur-md shadow-2xl">
+                <Badge tone="accent" className="text-3xs uppercase font-mono">
+                  Thesis Benchmark
+                </Badge>
+                <span className="text-2xs text-text-secondary">
+                  Shared dependency <strong className="text-white">Bank-A</strong> causes correlated dual PSP failure.
+                </span>
+              </div>
             </div>
           )}
+
           <PaymentGraph nodes={graph.nodes} edges={graph.edges} />
+
+          {/* Bottom Time-Travel Scrubber Dock */}
+          <div className="absolute bottom-4 left-6 right-6 z-20 pointer-events-none">
+            <div className="pointer-events-auto max-w-4xl mx-auto shadow-2xl">
+              <TimeTravelScrubber />
+            </div>
+          </div>
         </div>
-        <SidePanel sim={sim.data} win={win} attribution={attribution} />
+
+        {/* Right Side Panel */}
+        <div className="w-80 shrink-0 border-l border-white/[0.06] bg-[#07080C]/95 backdrop-blur-xl overflow-y-auto hidden xl:block">
+          <SidePanel sim={sim.data} win={win} attribution={attribution} />
+        </div>
       </div>
     </div>
   );

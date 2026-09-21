@@ -131,7 +131,8 @@ def generate(
     """
     txns: list[Transaction] = []
     noise_map = _window_noise(cfg)
-    n_methods = len(_METHODS)
+    active_methods = tuple(graph.routing.keys()) if graph.routing else _METHODS
+    n_methods = len(active_methods)
     n_cohorts = len(cfg.cohorts)
     n_geos = len(cfg.geographies)
     for window in range(cfg.n_windows):
@@ -139,7 +140,7 @@ def generate(
             rng = _txn_rng(cfg.seed, window, i)
             # demand attributes (drawn first, in a fixed order -> same regardless of
             # routing config, so the shared-seed counterfactual holds)
-            m = _METHODS[int(rng.random() * n_methods)]
+            m = active_methods[int(rng.random() * n_methods)]
             cohort = cfg.cohorts[int(rng.random() * n_cohorts)]
             geo = cfg.geographies[int(rng.random() * n_geos)]
             amount = cfg.avg_amount * (0.5 + rng.random())
@@ -220,15 +221,16 @@ def _failure_code(method: Method, r_code: float) -> str:
 
 def _ground_truth(incident: Incident, graph: PaymentGraph) -> GroundTruth:
     it = incident.incident_type
+    active_methods = list(graph.routing.keys()) if graph.routing else list(_METHODS)
     if it == IncidentType.SHARED_BANK:
         affected = graph.psps_for_bank(incident.target_id or "")
-        return GroundTruth(incident, affected, list(_METHODS), [incident.target_id or ""])
+        return GroundTruth(incident, affected, active_methods, [incident.target_id or ""])
     if it == IncidentType.SINGLE_PSP:
-        return GroundTruth(incident, [incident.target_id or ""], list(_METHODS), [incident.target_id or ""])
+        return GroundTruth(incident, [incident.target_id or ""], active_methods, [incident.target_id or ""])
     if it == IncidentType.METHOD:
         return GroundTruth(incident, sorted(graph.psps.keys()), [Method(incident.target_id)], [incident.target_id or ""])
     if it == IncidentType.COINCIDENTAL:
         causes = [c for c in (incident.target_id, incident.secondary_target_id) if c]
-        return GroundTruth(incident, sorted(causes), list(_METHODS), sorted(causes))
+        return GroundTruth(incident, sorted(causes), active_methods, sorted(causes))
     # NONE
     return GroundTruth(incident, [], [], [])

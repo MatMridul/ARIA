@@ -1,14 +1,25 @@
-/** Connect payment infrastructure — the topology-ingestion front door.
- * A thin, honest infrastructure-mapping workflow: paste a topology manifest,
- * validate it against the real /api/topology/import boundary, and on success see
- * the normalized topology + shared dependencies, then open the Command Center.
- * Uses the ARIA instrument visual language — no SaaS onboarding cards, no fake
- * connection statuses, no illustrations. In-memory only (no persistence claimed). */
+/**
+ * Connect payment infrastructure — Topology Ingestion Hub.
+ * Features Doppelrand card enclosures, Lucide status indicators, and live graph injection.
+ */
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import { cn } from "@/design/ui";
-import { importTopology, type ImportResult } from "@/lib";
+import { importTopology, useAppStore, type ImportResult } from "@/lib";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  Code2,
+  Database,
+  Layers,
+  Network,
+  RotateCcw,
+  Sparkles,
+} from "lucide-react";
 
 const EXAMPLE_MANIFEST = {
   merchant: { id: "mx_1", name: "Acme Commerce" },
@@ -47,6 +58,7 @@ type State =
 
 export function ConnectPage() {
   const navigate = useNavigate();
+  const { setCustomTopology } = useAppStore();
   const [text, setText] = useState(() => JSON.stringify(EXAMPLE_MANIFEST, null, 2));
   const [state, setState] = useState<State>({ phase: "edit" });
 
@@ -55,7 +67,7 @@ export function ConnectPage() {
     try {
       parsed = JSON.parse(text);
     } catch (e) {
-      setState({ phase: "invalid", errors: [`manifest is not valid JSON: ${(e as Error).message}`] });
+      setState({ phase: "invalid", errors: [`Manifest is not valid JSON: ${(e as Error).message}`] });
       return;
     }
     setState({ phase: "validating" });
@@ -68,77 +80,108 @@ export function ConnectPage() {
   }
 
   return (
-    <div className="flex h-full flex-col bg-bg-base">
-      {/* quiet header */}
-      <div className="border-b border-border-subtle px-6 py-4">
-        <h1 className="text-[13px] font-semibold uppercase tracking-[0.14em] text-text-secondary">
-          Connect payment infrastructure
+    <div className="flex h-full flex-col bg-bg-base overflow-hidden">
+      {/* Header */}
+      <div className="border-b border-white/[0.06] px-6 py-4 bg-[#07080C]/90 backdrop-blur-xl">
+        <div className="flex items-center gap-2 text-3xs font-semibold uppercase tracking-widest text-text-muted">
+          <Layers className="h-4 w-4 text-accent" />
+          Infrastructure Ingestion
+        </div>
+        <h1 className="text-xl font-bold text-text-primary tracking-tight mt-0.5">
+          Custom Payment Network Topology Manifest
         </h1>
-        <p className="mt-1 text-[12px] text-text-muted">
-          Define the dependencies ARIA will reason over. Provide a topology manifest
-          — methods, PSPs, banks, and the method → PSP → bank routes between them.
+        <p className="mt-1 text-xs text-text-secondary leading-relaxed">
+          Supply a JSON definition of payment methods, PSP gateways, and underlying bank settlement routes.
+          ARIA will automatically construct relational dependency models and extract shared banking bottlenecks.
         </p>
       </div>
 
       <div className="flex min-h-0 flex-1">
-        {/* manifest editor */}
-        <section className="flex min-w-0 flex-1 flex-col border-r border-border-subtle">
-          <div className="flex items-center justify-between border-b border-border-subtle px-5 py-2.5">
-            <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">
-              Topology manifest · JSON
-            </span>
+        {/* Manifest Editor Container */}
+        <section className="flex min-w-0 flex-1 flex-col border-r border-white/[0.06] bg-[#05060A]">
+          <div className="flex items-center justify-between border-b border-white/[0.06] px-5 py-2.5 bg-white/[0.01]">
+            <div className="flex items-center gap-2">
+              <Code2 className="h-3.5 w-3.5 text-accent" />
+              <span className="text-3xs font-semibold uppercase tracking-wider text-text-muted">
+                topology_manifest.json
+              </span>
+            </div>
             <button
-              onClick={() => { setText(JSON.stringify(EXAMPLE_MANIFEST, null, 2)); setState({ phase: "edit" }); }}
-              className="text-[10px] uppercase tracking-wide text-text-muted hover:text-text-secondary"
+              onClick={() => {
+                setText(JSON.stringify(EXAMPLE_MANIFEST, null, 2));
+                setState({ phase: "edit" });
+              }}
+              className="text-3xs uppercase tracking-wider text-text-muted hover:text-white flex items-center gap-1 transition-colors"
             >
-              reset to example
+              <RotateCcw className="h-3 w-3" /> Reset Template
             </button>
           </div>
+
           <textarea
             value={text}
-            onChange={(e) => { setText(e.target.value); if (state.phase !== "edit") setState({ phase: "edit" }); }}
+            onChange={(e) => {
+              setText(e.target.value);
+              if (state.phase !== "edit") setState({ phase: "edit" });
+            }}
             spellCheck={false}
             aria-label="Topology manifest JSON"
-            className="tabular min-h-0 flex-1 resize-none bg-bg-inset px-5 py-4 text-[12px] leading-relaxed text-text-secondary outline-none focus:text-text-primary"
+            className="tabular min-h-0 flex-1 resize-none bg-transparent p-5 font-mono text-xs leading-relaxed text-text-primary outline-none focus:ring-0 selection:bg-accent/30"
           />
-          <div className="flex items-center gap-3 border-t border-border-subtle px-5 py-3">
-            <button
+
+          <div className="flex items-center justify-between border-t border-white/[0.06] px-5 py-3 bg-[#08090D]">
+            <Button
+              variant="default"
+              size="sm"
               onClick={validate}
               disabled={state.phase === "validating"}
-              className="rounded-[3px] border border-accent/50 bg-accent/15 px-4 py-1.5 text-[12px] font-medium text-accent transition-colors hover:bg-accent/25 disabled:opacity-50"
+              className="text-xs font-semibold"
             >
-              {state.phase === "validating" ? "Validating…" : "Validate topology"}
-            </button>
-            <span className="text-[10px] text-text-muted">
-              validated against the live ingestion boundary · held in memory, not persisted
+              <Sparkles className="h-3.5 w-3.5" />
+              {state.phase === "validating" ? "Validating Topology…" : "Validate & Synthesize Graph"}
+            </Button>
+            <span className="text-3xs font-mono text-text-muted">
+              Live Schema Validation (Zod) · Memory Scoped
             </span>
           </div>
         </section>
 
-        {/* result rail */}
-        <aside className="flex w-[380px] shrink-0 flex-col overflow-y-auto bg-bg-inset px-5 py-4">
+        {/* Validation Result Rail */}
+        <aside className="w-[420px] shrink-0 flex flex-col overflow-y-auto bg-[#07080C] p-5 space-y-4">
+          <div className="text-3xs uppercase font-semibold tracking-wider text-text-muted">
+            Ingestion Diagnostic Status
+          </div>
+
           {state.phase === "edit" && (
-            <p className="text-[12px] text-text-muted">
-              Validate the manifest to map it into ARIA's dependency graph.
-            </p>
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 text-center space-y-2">
+              <Database className="h-8 w-8 text-text-muted mx-auto opacity-50" />
+              <div className="text-xs font-medium text-text-secondary">
+                Awaiting Manifest Validation
+              </div>
+              <p className="text-3xs text-text-muted leading-relaxed">
+                Click &quot;Validate & Synthesize Graph&quot; to ingest your custom routing schema into ARIA&apos;s simulation engine.
+              </p>
+            </div>
           )}
 
           {state.phase === "validating" && (
-            <p className="text-[12px] text-text-secondary">Validating topology…</p>
+            <div className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-5 text-center space-y-3">
+              <span className="h-6 w-6 animate-spin rounded-full border-2 border-accent border-t-transparent mx-auto block" />
+              <div className="text-xs font-medium text-text-primary">
+                Analyzing Relational Topology…
+              </div>
+            </div>
           )}
 
           {state.phase === "invalid" && (
-            <div>
-              <div className="mb-2 flex items-center gap-2">
-                <span className="h-1.5 w-1.5 rounded-full bg-down" />
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-down">
-                  Topology invalid · {state.errors.length} issue{state.errors.length === 1 ? "" : "s"}
-                </span>
+            <div className="rounded-2xl border border-status-down/40 bg-status-down/10 p-4 space-y-3">
+              <div className="flex items-center gap-2 text-status-down text-xs font-bold uppercase tracking-wide">
+                <AlertTriangle className="h-4 w-4 shrink-0" />
+                <span>Topology Validation Failed</span>
               </div>
-              <ul className="space-y-1.5">
+              <ul className="space-y-1.5 pl-6 list-disc text-2xs text-text-secondary">
                 {state.errors.map((e, i) => (
-                  <li key={i} className="tabular text-[11px] leading-snug text-text-secondary">
-                    <span className="text-down">•</span> {e}
+                  <li key={i} className="font-mono leading-relaxed">
+                    {e}
                   </li>
                 ))}
               </ul>
@@ -146,7 +189,13 @@ export function ConnectPage() {
           )}
 
           {state.phase === "valid" && (
-            <ValidResult result={state.result} onOpen={() => navigate("/")} />
+            <ValidResult
+              result={state.result}
+              onOpen={() => {
+                setCustomTopology(state.result.topology);
+                navigate("/");
+              }}
+            />
           )}
         </aside>
       </div>
@@ -157,38 +206,55 @@ export function ConnectPage() {
 function ValidResult({ result, onOpen }: { result: ImportResult; onOpen: () => void }) {
   const c = result.counts;
   const sharedIds = Object.keys(result.shared_dependencies);
+
   return (
-    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}>
-      <div className="mb-3 flex items-center gap-2">
-        <span className="h-1.5 w-1.5 rounded-full bg-healthy" />
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-healthy">
-          Topology validated
-        </span>
-      </div>
-
-      <div className="text-[15px] font-semibold tracking-tight text-text-primary">
-        {c.methods} payment methods · {c.psps} PSPs · {c.banks} banking dependencies
-      </div>
-      <div className="tabular mt-0.5 text-[11px] text-text-muted">{c.routes} routes mapped</div>
-
-      {/* shared dependencies — the thing ARIA reasons over */}
-      <div className="mt-4 border-t border-border-subtle pt-3">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">
-          Shared dependencies detected
+    <motion.div initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
+      <div className="rounded-2xl border border-status-healthy/40 bg-status-healthy/10 p-4 space-y-3">
+        <div className="flex items-center gap-2 text-status-healthy text-xs font-bold uppercase tracking-wider">
+          <CheckCircle2 className="h-4 w-4" />
+          <span>Topology Synthesized Cleanly</span>
         </div>
+
+        <div className="grid grid-cols-2 gap-2 text-2xs font-mono pt-1">
+          <div className="bg-black/40 p-2 rounded-xl border border-white/[0.04]">
+            <span className="text-text-muted text-3xs uppercase block">Methods</span>
+            <strong className="text-white text-sm">{c.methods} Rails</strong>
+          </div>
+          <div className="bg-black/40 p-2 rounded-xl border border-white/[0.04]">
+            <span className="text-text-muted text-3xs uppercase block">PSPs</span>
+            <strong className="text-white text-sm">{c.psps} Gateways</strong>
+          </div>
+          <div className="bg-black/40 p-2 rounded-xl border border-white/[0.04]">
+            <span className="text-text-muted text-3xs uppercase block">Banks</span>
+            <strong className="text-white text-sm">{c.banks} Acquirers</strong>
+          </div>
+          <div className="bg-black/40 p-2 rounded-xl border border-white/[0.04]">
+            <span className="text-text-muted text-3xs uppercase block">Routes</span>
+            <strong className="text-accent text-sm">{c.routes} Edges</strong>
+          </div>
+        </div>
+      </div>
+
+      {/* Shared Dependencies Extraction */}
+      <div className="rounded-2xl border border-white/[0.08] bg-white/[0.02] p-4 space-y-2.5">
+        <div className="text-3xs uppercase font-semibold text-text-muted tracking-widest flex items-center gap-1.5">
+          <Network className="h-3.5 w-3.5 text-status-info" /> Extracted Shared Dependencies
+        </div>
+
         {sharedIds.length === 0 ? (
-          <p className="mt-1.5 text-[11px] text-text-muted">
-            None — no bank is shared by more than one PSP. ARIA's relational edge is
-            strongest when a bank is shared.
+          <p className="text-2xs text-text-muted leading-relaxed">
+            No shared banking dependencies detected across multiple PSPs.
           </p>
         ) : (
-          <ul className="mt-2 space-y-1.5">
+          <ul className="space-y-2">
             {sharedIds.map((bid) => (
-              <li key={bid} className="flex items-center gap-2 text-[11px]">
-                <span className="tabular font-medium text-info">{bid}</span>
-                <span className="text-text-muted">shared by</span>
-                <span className="tabular text-text-secondary">
-                  {result.shared_dependencies[bid].join(", ")}
+              <li
+                key={bid}
+                className="flex items-center justify-between text-2xs bg-black/40 p-2.5 rounded-xl border border-white/[0.04]"
+              >
+                <span className="font-mono font-bold text-status-info">{bid}</span>
+                <span className="text-text-secondary font-mono text-3xs">
+                  Settles: {result.shared_dependencies[bid].join(", ")}
                 </span>
               </li>
             ))}
@@ -196,15 +262,9 @@ function ValidResult({ result, onOpen }: { result: ImportResult; onOpen: () => v
         )}
       </div>
 
-      <button
-        onClick={onOpen}
-        className="mt-5 w-full rounded-[3px] border border-accent/50 bg-accent/15 px-4 py-2 text-[12px] font-medium text-accent transition-colors hover:bg-accent/25"
-      >
-        Open Command Center →
-      </button>
-      <p className="mt-2 text-[10px] text-text-muted">
-        The Command Center visualizes the same topology through ARIA's payment network.
-      </p>
+      <Button variant="glow" size="lg" onClick={onOpen} className="w-full text-xs font-bold">
+        Launch Active Session in Command Center <ArrowRight className="h-4 w-4 ml-1" />
+      </Button>
     </motion.div>
   );
 }

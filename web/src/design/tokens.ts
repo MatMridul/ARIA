@@ -1,36 +1,39 @@
 /**
  * SINGLE source of truth for raw color values used OUTSIDE Tailwind classes —
  * i.e. anywhere we must pass a literal hex (SVG strokes/fills, React Flow, Recharts,
- * canvas). These MUST mirror `tailwind.config.js`; importing from here stops the
- * documented token drift where each viz file re-typed the palette as raw strings.
- *
- * Rule: components style with Tailwind classes; only low-level SVG/chart props that
- * cannot take a class read from `TOKENS`.
+ * canvas). These mirror `tailwind.config.js`.
  */
 export const TOKENS = {
   bg: {
-    base: "#080a0f",
-    surface: "#0d1017",
-    raised: "#12161f",
-    hover: "#1a1f2b",
-    inset: "#05070b",
+    base: "#030305",
+    inset: "#07070A",
+    surface: "#0C0D12",
+    raised: "#13151C",
+    hover: "#1C1F2B",
+    overlay: "rgba(3, 3, 5, 0.85)",
   },
   border: {
-    subtle: "#171b24",
-    DEFAULT: "#232a36",
-    strong: "#333d4e",
+    subtle: "rgba(255, 255, 255, 0.06)",
+    DEFAULT: "rgba(255, 255, 255, 0.10)",
+    strong: "rgba(255, 255, 255, 0.18)",
+    highlight: "rgba(255, 255, 255, 0.35)",
   },
   text: {
-    primary: "#eef2f6",
-    secondary: "#8b96a6",
-    muted: "#59626f",
+    primary: "#F8FAFC",
+    secondary: "#94A3B8",
+    muted: "#64748B",
   },
   status: {
-    healthy: "#3ad19a",
-    degraded: "#f2a33c",
-    down: "#f65e6e",
-    info: "#5aa2f0",
-    accent: "#4db6c9",
+    healthy: "#10B981",
+    healthyGlow: "rgba(16, 185, 129, 0.25)",
+    degraded: "#F59E0B",
+    degradedGlow: "rgba(245, 158, 11, 0.25)",
+    down: "#EF4444",
+    downGlow: "rgba(239, 68, 68, 0.35)",
+    info: "#06B6D4",
+    infoGlow: "rgba(6, 182, 212, 0.25)",
+    accent: "#6366F1",
+    accentGlow: "rgba(99, 102, 241, 0.25)",
   },
 } as const;
 
@@ -41,5 +44,5 @@ export const HEALTH_HEX: Record<Health, string> = {
   healthy: TOKENS.status.healthy,
   degraded: TOKENS.status.degraded,
   down: TOKENS.status.down,
-  idle: TOKENS.border.strong,
+  idle: "#333D4E",
 };

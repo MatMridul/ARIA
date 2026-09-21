@@ -19,16 +19,20 @@ body {
   font-family: theme("fontFamily.sans");
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
+  overflow-x: hidden;
 }
 
-/* thin control-room scrollbars */
+/* Thin control-room cyber scrollbars */
 ::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-thumb {
-  background: theme("colors.border.DEFAULT");
-  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.14);
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.28);
 }
 ::-webkit-scrollbar-track {
   background: transparent;
@@ -39,24 +43,74 @@ body {
 .instrument-grid {
   background-color: theme("colors.bg.inset");
   background-image:
-    linear-gradient(theme("colors.border.subtle") 1px, transparent 1px),
-    linear-gradient(90deg, theme("colors.border.subtle") 1px, transparent 1px);
-  background-size: 40px 40px;
+    linear-gradient(rgba(255, 255, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
   background-position: -1px -1px;
 }
+
 .instrument-vignette {
-  box-shadow: inset 0 0 160px 40px rgba(0, 0, 0, 0.55);
+  box-shadow: inset 0 0 180px 50px rgba(0, 0, 0, 0.75);
 }
 
-/* Large human-facing figures: tabular Inter (aligned, NOT terminal-mono). */
+/* Hardware Doppelrand (Double-Bezel) container */
+.doppelrand {
+  position: relative;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 1rem;
+  padding: 3px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.07);
+}
+
+.doppelrand-inner {
+  background: rgba(12, 13, 18, 0.92);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-radius: calc(1rem - 3px);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: inset 0 1px 0 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Floating Glass HUD Dock */
+.glass-dock {
+  background: rgba(12, 13, 18, 0.82);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 
+    0 20px 40px -15px rgba(0, 0, 0, 0.8),
+    inset 0 1px 0 0 rgba(255, 255, 255, 0.18);
+}
+
+/* Large human-facing figures: tabular Inter */
 .tnum {
   font-variant-numeric: tabular-nums;
   font-feature-settings: "tnum" 1, "cv01" 1;
   letter-spacing: -0.01em;
 }
 
-/* System telemetry / IDs / code readouts: tabular monospace. */
+/* System telemetry / IDs / code readouts: tabular monospace */
 .tabular {
   font-variant-numeric: tabular-nums;
   font-family: theme("fontFamily.mono");
+}
+
+/* Radix & Keyframe Animations */
+@keyframes fadeIn {
+  from { opacity: 0; transform: scale(0.98); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+@keyframes slideDownAndFade {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes slideUpAndFade {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.animate-fade-in {
+  animation: fadeIn 150ms cubic-bezier(0.16, 1, 0.3, 1);
 }

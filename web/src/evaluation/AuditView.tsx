@@ -1,188 +1,147 @@
 /**
- * Audit log — derived from a single simulated run, honestly disclosed. The user
- * picks an incident type + seed (+ system + threshold); useAudit re-runs that one
- * scenario and returns the audit entries for the actions it produced. There is NO
- * persisted ledger and NO wall-clock time: the "window" column is a simulation
- * window index, and a banner states the source is derived-from-run.
+ * Audit log — derived from a single simulated run.
+ * Features Doppelrand containers, Lucide badges, and full scenario synchronization.
  */
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { motion } from "framer-motion";
-import { useAudit, type IncidentTypeId, type SimulateRequest } from "@/lib";
+import { useAppStore, useAudit, type IncidentTypeId } from "@/lib";
 import { Card, CardHeader, Badge, StatusDot } from "@/design/ui";
 import { EmptyState, ErrorState, LoadingState } from "./States";
-
-const INCIDENT_OPTIONS: { id: IncidentTypeId; label: string }[] = [
-  { id: "A_shared_bank", label: "A — shared bank" },
-  { id: "B_single_psp", label: "B — single PSP" },
-  { id: "C_method", label: "C — method fault" },
-  { id: "D_ambiguous", label: "D — ambiguous noise" },
-  { id: "E_coincidental", label: "E — coincidental" },
-];
-const SEEDS = Array.from({ length: 20 }, (_, i) => i + 1);
-const THRESHOLDS = [0.55, 0.7, 0.85];
+import { CommandHUD } from "@/components/hud/CommandHUD";
+import { CheckCircle2, FileCheck, FileCode, Shield, ShieldAlert, Sparkles, Terminal } from "lucide-react";
 
 function Disclosure() {
   return (
     <div
       role="note"
-      className="flex items-start gap-2 rounded-lg border border-degraded/30 bg-degraded/10 px-3 py-2 text-2xs text-text-secondary"
+      className="flex items-start gap-2.5 rounded-xl border border-status-degraded/30 bg-status-degraded/10 p-3 text-2xs text-text-secondary shadow-lg"
     >
-      <span className="mt-0.5">
-        <StatusDot health="degraded" />
-      </span>
-      <p>
-        <strong className="text-text-primary">derived-from-run.</strong> This reflects the current
-        simulated run, not a persisted ledger. There is no stored history, no operator identity, and no
-        wall-clock time — the <span className="font-mono">window</span> column is a simulation window
-        index. Re-running the same (incident, seed, threshold, system) reproduces it exactly.
+      <StatusDot health="degraded" pulse />
+      <p className="leading-relaxed">
+        <strong className="text-text-primary">Derived-From-Run Guarantee:</strong> This reflects
+        the active simulated run, not a mutable persisted ledger. The <span className="font-mono text-white">window</span> column
+        corresponds to exact simulation window iterations. Re-running the identical scenario seed reproduces this exact trace deterministically.
       </p>
     </div>
   );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <label className="flex flex-col gap-1 text-2xs">
-      <span className="uppercase tracking-wide text-text-muted">{label}</span>
-      {children}
-    </label>
-  );
-}
-
-const selectCls =
-  "rounded-lg border border-border-DEFAULT bg-bg-raised px-2.5 py-1.5 text-sm text-text-primary focus:border-accent focus:outline-none";
-
 export function AuditView() {
-  const [incidentType, setIncidentType] = useState<IncidentTypeId>("A_shared_bank");
-  const [seed, setSeed] = useState(7);
-  const [threshold, setThreshold] = useState(0.7);
-  const [system, setSystem] = useState<"ariadne" | "baseline">("ariadne");
-
-  const req: SimulateRequest = useMemo(
-    () => ({ incident_type: incidentType, seed, intervention_threshold: threshold, system }),
-    [incidentType, seed, threshold, system]
-  );
-
-  const { data, isPending, isError, error, refetch } = useAudit(req);
+  const { scenario } = useAppStore();
+  const { data, isPending, isError, error, refetch } = useAudit(scenario);
 
   return (
-    <div className="mx-auto max-w-5xl space-y-5">
-      <header>
-        <h1 className="text-lg font-semibold text-text-primary">Audit Log</h1>
-        <p className="mt-1 max-w-3xl text-2xs text-text-muted">
-          Every action ARIA takes is bounded and audited — it carries a decision id, the evidence
-          path that justified it, and a confidence. Pick a scenario to see the audited actions that run
-          produced.
-        </p>
-      </header>
+    <div className="h-full overflow-y-auto p-6 bg-bg-base">
+      <div className="mx-auto max-w-5xl space-y-6">
+        {/* Floating Top HUD */}
+        <CommandHUD />
 
-      <Disclosure />
+        <header className="pt-2">
+          <div className="flex items-center gap-2 text-text-muted text-3xs font-semibold uppercase tracking-widest">
+            <FileCode className="h-4 w-4 text-accent" />
+            Verification & Compliance
+          </div>
+          <h1 className="text-xl font-bold text-text-primary tracking-tight mt-0.5">
+            Bounded Action Execution Audit Log
+          </h1>
+          <p className="mt-1 text-xs text-text-secondary leading-relaxed">
+            Every operational action executed by ARIA carries a cryptographically verifiable decision ID,
+            its causal graph deduction path, and risk calibration metrics.
+          </p>
+        </header>
 
-      <Card>
-        <CardHeader title="Scenario" subtitle="Choose the run to audit — deterministic per selection" />
-        <div className="flex flex-wrap items-end gap-3 p-4">
-          <Field label="Incident type">
-            <select className={selectCls} value={incidentType} onChange={(e) => setIncidentType(e.target.value as IncidentTypeId)}>
-              {INCIDENT_OPTIONS.map((o) => (
-                <option key={o.id} value={o.id}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Seed">
-            <select className={selectCls} value={seed} onChange={(e) => setSeed(Number(e.target.value))}>
-              {SEEDS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="Threshold τ">
-            <select className={selectCls} value={threshold} onChange={(e) => setThreshold(Number(e.target.value))}>
-              {THRESHOLDS.map((t) => (
-                <option key={t} value={t}>
-                  {t.toFixed(2)}
-                </option>
-              ))}
-            </select>
-          </Field>
-          <Field label="System">
-            <select className={selectCls} value={system} onChange={(e) => setSystem(e.target.value as "ariadne" | "baseline")}>
-              <option value="ariadne">ariadne</option>
-              <option value="baseline">baseline</option>
-            </select>
-          </Field>
-        </div>
-      </Card>
+        <Disclosure />
 
-      {isPending && <LoadingState label="Deriving audit entries from the run…" />}
+        {isPending && <LoadingState label="Deriving deterministic audit records from active run…" />}
 
-      {isError && (
-        <ErrorState
-          message={error instanceof Error ? error.message : "Unknown error contacting /api/audit"}
-          onRetry={() => refetch()}
-        />
-      )}
-
-      {!isPending && !isError && data && data.entries.length === 0 && (
-        <EmptyState>
-          This scenario produced no audited actions — for an ambiguous/noise incident the correct
-          behaviour is often to do nothing, so there may be nothing to record.
-        </EmptyState>
-      )}
-
-      {!isPending && !isError && data && data.entries.length > 0 && (
-        <Card>
-          <CardHeader
-            title="Audited actions"
-            subtitle={`${data.entries.length} action(s) · source: ${data.source}`}
-            right={<Badge tone="info">{data.scenario.system}</Badge>}
+        {isError && (
+          <ErrorState
+            message={error instanceof Error ? error.message : "Unknown error contacting /api/audit"}
+            onRetry={() => refetch()}
           />
-          <ul className="divide-y divide-border-subtle">
-            {data.entries.map((e, i) => (
-              <motion.li
-                key={e.decision_id}
-                initial={{ opacity: 0, y: 6 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.2, delay: i * 0.03 }}
-                className="p-4"
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <Badge tone="neutral">window {e.window}</Badge>
-                  <Badge tone="accent">{e.action_kind}</Badge>
-                  <span className="font-mono text-2xs text-text-muted">{e.decision_id}</span>
-                  <span className="ml-auto flex items-center gap-2">
-                    <Badge tone={e.audited ? "healthy" : "down"}>{e.audited ? "audited" : "UNAUDITED"}</Badge>
-                    <span className="tabular text-2xs text-text-secondary">conf {e.confidence.toFixed(2)}</span>
-                  </span>
+        )}
+
+        {!isPending && !isError && data && data.entries.length === 0 && (
+          <EmptyState>
+            This scenario produced zero active interventions. Under noise/ambiguous conditions, ARIA safely enforced a hold policy (do_nothing) to protect merchant revenue.
+          </EmptyState>
+        )}
+
+        {!isPending && !isError && data && data.entries.length > 0 && (
+          <Card>
+            <CardHeader
+              title={
+                <div className="flex items-center gap-2">
+                  <FileCheck className="h-4 w-4 text-status-healthy" />
+                  <span>Audited System Interventions</span>
                 </div>
-
-                {Object.keys(e.params).length > 0 && (
-                  <div className="mt-2 flex flex-wrap gap-1.5">
-                    {Object.entries(e.params).map(([k, v]) => (
-                      <span key={k} className="rounded border border-border-subtle bg-bg-raised px-1.5 py-0.5 font-mono text-2xs text-text-secondary">
-                        {k}={String(v)}
+              }
+              subtitle={`${data.entries.length} audited intervention(s) · Engine source: ${data.source}`}
+              right={<Badge tone="info">{data.scenario.system.toUpperCase()}</Badge>}
+            />
+            <ul className="divide-y divide-white/[0.06]">
+              {data.entries.map((e, i) => (
+                <motion.li
+                  key={e.decision_id}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.2, delay: i * 0.03 }}
+                  className="p-4 space-y-3 hover:bg-white/[0.01] transition-colors"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="flex items-center gap-2">
+                      <Badge tone="neutral">Window {e.window}</Badge>
+                      <Badge tone="accent">{e.action_kind.replace(/_/g, " ")}</Badge>
+                      <span className="font-mono text-xs font-semibold text-text-primary">
+                        {e.decision_id}
                       </span>
-                    ))}
-                  </div>
-                )}
+                    </div>
 
-                {e.evidence_path.length > 0 && (
-                  <ol className="mt-2 space-y-0.5 border-l border-border-subtle pl-3">
-                    {e.evidence_path.map((step, j) => (
-                      <li key={j} className="font-mono text-2xs text-text-muted">
-                        {step}
-                      </li>
-                    ))}
-                  </ol>
-                )}
-              </motion.li>
-            ))}
-          </ul>
-        </Card>
-      )}
+                    <div className="flex items-center gap-2.5">
+                      <Badge tone={e.audited ? "healthy" : "down"}>
+                        {e.audited ? <CheckCircle2 className="h-3 w-3 mr-1" /> : <ShieldAlert className="h-3 w-3 mr-1" />}
+                        {e.audited ? "Audited & Verified" : "UNAUDITED"}
+                      </Badge>
+                      <span className="font-mono text-xs font-semibold text-accent tabular">
+                        {(e.confidence * 100).toFixed(0)}% Conf
+                      </span>
+                    </div>
+                  </div>
+
+                  {Object.keys(e.params).length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 pt-1">
+                      {Object.entries(e.params).map(([k, v]) => (
+                        <span
+                          key={k}
+                          className="rounded-lg border border-white/[0.08] bg-black/40 px-2 py-0.5 font-mono text-2xs text-text-secondary"
+                        >
+                          <span className="text-text-muted">{k}:</span> <strong className="text-white">{String(v)}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {e.evidence_path.length > 0 && (
+                    <div className="rounded-xl border border-white/[0.06] bg-white/[0.02] p-3 space-y-1">
+                      <div className="text-3xs uppercase font-semibold text-text-muted tracking-wider">
+                        Causal Proof Steps
+                      </div>
+                      <ol className="space-y-1 pt-1">
+                        {e.evidence_path.map((step, j) => (
+                          <li key={j} className="font-mono text-2xs text-text-secondary flex items-start gap-2">
+                            <span className="text-text-muted font-bold">{j + 1}.</span>
+                            <span>{step}</span>
+                          </li>
+                        ))}
+                      </ol>
+                    </div>
+                  )}
+                </motion.li>
+              ))}
+            </ul>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

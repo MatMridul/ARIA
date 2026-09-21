@@ -123,13 +123,18 @@ def select_action(
     recovery_txns = _expected_recovery(stats, bad, best_target)
     expected_recovery_money = recovery_txns * avg_amount
 
-    # reroute the worst bad PSP's traffic (thin loop reroutes one method: UPI as
-    # the representative method; the eval re-simulates ALL methods off bad PSPs).
+    # reroute the worst bad PSP's traffic (thin loop reroutes one method; the
+    # eval re-simulates ALL methods off bad PSPs). Pick an active method carried by worst.
     worst = min(bad, key=lambda p: _psp_by_id(stats).get(p, None).delta
                 if p in _psp_by_id(stats) else 0.0)
+    carrying_methods = [
+        m for m, pairs in graph.routing.items()
+        if any(p == worst and w > 0.0 for p, w in pairs)
+    ]
+    rep_method = carrying_methods[0] if carrying_methods else (next(iter(graph.routing.keys())) if graph.routing else Method.UPI)
     return A.reroute(
         graph,
-        method=Method.UPI,
+        method=rep_method,
         from_psp=worst,
         to_psp=best_target,
         confidence=attr.confidence,

@@ -2,31 +2,23 @@
  * Semantic-motion traffic edge — ARIA's visual signature.
  *
  * Traffic "particles" flow from source to target along the edge path using SVG
- * <animateMotion> (GPU-friendly, declarative, NO per-frame requestAnimationFrame
- * loop — so there is nothing to leak or run away). Speed encodes health:
+ * <animateMotion> (GPU-friendly, declarative). Speed encodes health:
  *   healthy  -> fast flow (money moving)
- *   degraded -> slow flow (payments struggling)
- *   down     -> NO particles (flow stopped)
- * Performance guardrails:
- *   - particle count is CAPPED at 2 per edge (`PARTICLES`), and 0 when down,
- *   - animation is pure declarative SVG SMIL (no JS timers/rAF),
- *   - particles are only rendered for healthy/degraded edges.
+ *   degraded -> slow sluggish flow (payments struggling)
+ *   down     -> NO particles (flow stopped, dashed line)
+ *   reroute  -> rapid emerald burst (mitigation active)
  */
 import { BaseEdge, getBezierPath, type EdgeProps } from "@xyflow/react";
 import type { Health } from "@/design/ui";
 import { HEALTH_HEX, TOKENS } from "@/design/tokens";
 import type { FlowEdgeData } from "./types";
 
-const PARTICLES = 2; // hard cap per edge
-
 const DUR: Record<Health, number> = {
-  healthy: 2.2, // seconds per traversal — brisk
-  degraded: 5.5, // sluggish
+  healthy: 1.8, // brisk
+  degraded: 4.5, // sluggish
   down: 0, // stopped
-  idle: 3.5,
+  idle: 3.0,
 };
-
-const STROKE: Record<Health, string> = HEALTH_HEX;
 
 export function FlowEdge({
   id,
@@ -52,19 +44,36 @@ export function FlowEdge({
   const health: Health = d.health ?? "idle";
   const highlighted = !!d.highlighted;
   const reroute = !!d.reroute;
-  const dur = DUR[health];
+
+  // Particle timing & counts
+  const dur = reroute ? 1.0 : DUR[health];
+  const particlesCount = reroute ? 3 : 2;
   const showParticles = dur > 0;
 
   const baseColor = highlighted
     ? TOKENS.status.accent
     : reroute
     ? TOKENS.status.healthy
-    : STROKE[health];
-  const width = highlighted || reroute ? 2.5 : health === "down" ? 1 : 1.5;
-  const opacity = health === "down" ? 0.35 : 0.8;
+    : HEALTH_HEX[health];
+
+  const width = highlighted || reroute ? 2.5 : health === "down" ? 1.2 : 1.5;
+  const opacity = health === "down" ? 0.3 : 0.85;
 
   return (
     <>
+      {/* Background glow stroke on highlighted / rerouted paths */}
+      {(highlighted || reroute) && (
+        <path
+          d={edgePath}
+          fill="none"
+          stroke={baseColor}
+          strokeWidth={6}
+          opacity={0.25}
+          className="blur-sm"
+        />
+      )}
+
+      {/* Main Base Edge */}
       <BaseEdge
         id={id}
         path={edgePath}
@@ -74,20 +83,29 @@ export function FlowEdge({
           strokeWidth: width,
           opacity,
           strokeDasharray: health === "down" ? "4 4" : undefined,
-          transition: "stroke 0.4s ease, opacity 0.4s ease",
+          transition: "stroke 0.3s ease, opacity 0.3s ease",
         }}
       />
+
+      {/* SVG Animated Particles */}
       {showParticles &&
-        Array.from({ length: PARTICLES }).map((_, i) => (
+        Array.from({ length: particlesCount }).map((_, i) => (
           <circle
             key={`${id}-p${i}`}
-            r={highlighted || reroute ? 3 : 2.2}
+            r={reroute ? 3.5 : highlighted ? 3 : 2.2}
             fill={baseColor}
             opacity={0.95}
+            style={{
+              filter: reroute
+                ? "drop-shadow(0 0 6px rgba(16, 185, 129, 0.9))"
+                : highlighted
+                ? "drop-shadow(0 0 6px rgba(99, 102, 241, 0.9))"
+                : `drop-shadow(0 0 4px ${baseColor})`,
+            }}
           >
             <animateMotion
               dur={`${dur}s`}
-              begin={`${(dur / PARTICLES) * i}s`}
+              begin={`${(dur / particlesCount) * i}s`}
               repeatCount="indefinite"
               path={edgePath}
             />

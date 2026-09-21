@@ -4,40 +4,71 @@ export default {
   theme: {
     extend: {
       colors: {
-        // ARIA instrument substrate — graphite / blue-black, cool and deep.
-        // A real elevation ladder (base -> surface -> raised -> hover), not flat slate.
+        // ARIA Mission Control OLED Substrate
         bg: {
-          base: "#080a0f",
-          surface: "#0d1017",
-          raised: "#12161f",
-          hover: "#1a1f2b",
-          inset: "#05070b",
+          base: "#030305",
+          inset: "#07070A",
+          surface: "#0C0D12",
+          raised: "#13151C",
+          hover: "#1C1F2B",
+          overlay: "rgba(3, 3, 5, 0.85)",
         },
         border: {
-          subtle: "#171b24",
-          DEFAULT: "#232a36",
-          strong: "#333d4e",
+          subtle: "rgba(255, 255, 255, 0.06)",
+          DEFAULT: "rgba(255, 255, 255, 0.10)",
+          strong: "rgba(255, 255, 255, 0.18)",
+          highlight: "rgba(255, 255, 255, 0.35)",
         },
         text: {
-          primary: "#eef2f6",
-          secondary: "#8b96a6",
-          muted: "#59626f",
+          primary: "#F8FAFC",
+          secondary: "#94A3B8",
+          muted: "#64748B",
         },
-        // semantic status — communicates state, never decoration.
-        healthy: "#3ad19a",
-        degraded: "#f2a33c",
-        down: "#f65e6e",
-        info: "#5aa2f0",
-        // accent = selection/focus only. A cool steel-cyan, NOT periwinkle,
-        // NOT gold — it must not become the brand's primary color.
-        accent: "#4db6c9",
+        // Semantic status colors with backward compatibility
+        healthy: "#10B981",
+        degraded: "#F59E0B",
+        down: "#EF4444",
+        info: "#06B6D4",
+        accent: "#6366F1",
+        status: {
+          healthy: "#10B981",
+          healthyGlow: "rgba(16, 185, 129, 0.25)",
+          degraded: "#F59E0B",
+          degradedGlow: "rgba(245, 158, 11, 0.25)",
+          down: "#EF4444",
+          downGlow: "rgba(239, 68, 68, 0.35)",
+          info: "#06B6D4",
+          infoGlow: "rgba(6, 182, 212, 0.25)",
+          accent: "#6366F1",
+          accentGlow: "rgba(99, 102, 241, 0.25)",
+        },
       },
       fontFamily: {
-        sans: ["Inter", "system-ui", "sans-serif"],
-        mono: ["JetBrains Mono", "ui-monospace", "monospace"],
+        sans: ["Inter", "-apple-system", "BlinkMacSystemFont", "Segoe UI", "Roboto", "sans-serif"],
+        mono: ["JetBrains Mono", "ui-monospace", "SFMono-Regular", "Menlo", "monospace"],
       },
       fontSize: {
+        "3xs": ["0.625rem", { lineHeight: "0.875rem" }],
         "2xs": ["0.6875rem", { lineHeight: "1rem" }],
+      },
+      boxShadow: {
+        "glow-healthy": "0 0 20px -3px rgba(16, 185, 129, 0.35)",
+        "glow-degraded": "0 0 20px -3px rgba(245, 158, 11, 0.35)",
+        "glow-down": "0 0 24px -2px rgba(239, 68, 68, 0.45)",
+        "glow-accent": "0 0 20px -3px rgba(99, 102, 241, 0.35)",
+        "glow-cyan": "0 0 20px -3px rgba(6, 182, 212, 0.35)",
+        "inner-specular": "inset 0 1px 0 0 rgba(255, 255, 255, 0.12)",
+      },
+      animation: {
+        "pulse-slow": "pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite",
+        "radar-ping": "radar 2.5s cubic-bezier(0, 0, 0.2, 1) infinite",
+      },
+      keyframes: {
+        radar: {
+          "0%": { transform: "scale(0.95)", opacity: "0.8" },
+          "70%": { transform: "scale(2.2)", opacity: "0" },
+          "100%": { transform: "scale(2.2)", opacity: "0" },
+        },
       },
     },
   },

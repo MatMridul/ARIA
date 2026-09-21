@@ -1,13 +1,16 @@
-/** Recommended intervention — an operational decision surface, NOT a CTA card.
- * Reads like an ops console: the intervention spec (kind + routing), expected
- * recovery, bounded-risk indicator, and two restrained operator controls.
- * EXECUTE reveals the REAL shared-seed money_recovered (may be negative, shown
- * honestly); DO NOTHING is the safe default. Everything simulated + labelled. */
+/**
+ * Recommended intervention — an operational decision surface.
+ * Features Doppelrand framing, spring Odometer numbers, and bounded policy controls.
+ */
 import { useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { cn, inr } from "@/design/ui";
 import type { Action } from "@/lib";
 import { isDoNothing } from "./helpers";
+import { OdometerTicker } from "@/components/telemetry/OdometerTicker";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ArrowRight, CheckCircle2, ShieldCheck, Zap } from "lucide-react";
 
 type Choice = "execute" | "do_nothing" | null;
 
@@ -31,65 +34,80 @@ export function RecoveryConsole({
   const to = prettyPsp(action.params["to_psp"]);
 
   return (
-    <div className="px-5 py-4">
-      <div className="mb-2.5 flex items-center justify-between">
-        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-text-muted">
-          Recommended intervention
-        </div>
-        <span className="tabular text-[9px] uppercase tracking-wide text-text-muted">bounded · auditable</span>
-      </div>
-
-      {/* intervention spec — instrument readout, not a button */}
-      <div className="flex items-baseline gap-3">
-        <span className="text-lg font-semibold uppercase tracking-tight text-text-primary">
-          {action.kind === "do_nothing" ? "Hold" : action.kind}
-        </span>
-        {method && to && (
-          <span className="tabular text-[12px] text-text-secondary">
-            {method} · {from} <span className="text-accent">→</span> {to}
+    <div className="p-4 space-y-3.5">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-1.5">
+          <Zap className="h-3.5 w-3.5 text-accent" />
+          <span className="text-3xs font-semibold uppercase tracking-widest text-text-muted">
+            Bounded Action Policy
           </span>
+        </div>
+        <Badge variant="healthy" className="text-3xs uppercase font-mono">
+          <ShieldCheck className="h-2.5 w-2.5 mr-1" /> Bounded
+        </Badge>
+      </div>
+
+      {/* Intervention Action Banner */}
+      <div className="rounded-xl border border-white/[0.08] bg-white/[0.02] p-3 space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm font-bold uppercase tracking-tight text-white flex items-center gap-1.5">
+            {action.kind === "do_nothing" ? "HOLD / NO INTERVENTION" : action.kind}
+          </span>
+          <span className="font-mono text-3xs text-text-muted">
+            {action.decision_id || "DEC-DEFAULT"}
+          </span>
+        </div>
+
+        {method && to && (
+          <div className="flex items-center gap-1.5 text-xs text-text-secondary bg-black/40 px-2.5 py-1.5 rounded-lg border border-white/[0.04] font-mono">
+            <span className="text-white font-semibold">{method}</span>
+            <span className="text-text-muted">:</span>
+            <span className="text-status-down">{from}</span>
+            <ArrowRight className="h-3 w-3 text-accent" />
+            <span className="text-status-healthy font-semibold">{to}</span>
+          </div>
         )}
+
+        <div className="grid grid-cols-2 gap-2 pt-1 text-2xs">
+          <div>
+            <div className="text-3xs uppercase text-text-muted">Expected Yield</div>
+            <div className="font-mono text-xs font-semibold text-text-primary mt-0.5">
+              {inr(action.expected_recovery)}
+            </div>
+          </div>
+          <div>
+            <div className="text-3xs uppercase text-text-muted">Action Confidence</div>
+            <div className="font-mono text-xs font-semibold text-accent mt-0.5">
+              {Math.round(action.confidence * 100)}%
+            </div>
+          </div>
+        </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-border-subtle pt-3">
-        <Field label="Expected recovery" value={inr(action.expected_recovery)} />
-        <Field label="Risk" value="bounded" tone="healthy" />
-        <Field label="Decision" value={action.decision_id || "—"} mono />
-        <Field label="Confidence" value={`${Math.round(action.confidence * 100)}%`} />
-      </div>
-
-      {/* operator controls — restrained, framed, not CTAs */}
-      <div className="mt-3 flex overflow-hidden rounded-[3px] border border-border-DEFAULT">
-        <button
+      {/* Operator Execution Controls */}
+      <div className="grid grid-cols-2 gap-2">
+        <Button
+          variant={choice === "execute" ? "glow" : "secondary"}
+          size="sm"
           onClick={() => setChoice("execute")}
           disabled={recommendedDoNothing}
-          aria-pressed={choice === "execute"}
-          className={cn(
-            "flex-1 px-3 py-2 text-[12px] font-medium transition-colors focus:outline-none focus:ring-1 focus:ring-accent disabled:cursor-not-allowed disabled:opacity-40",
-            choice === "execute"
-              ? "bg-accent/15 text-accent"
-              : "bg-bg-hover text-text-secondary hover:text-text-primary"
-          )}
+          className="text-xs font-semibold"
         >
-          Execute
-        </button>
-        <button
+          Execute Action
+        </Button>
+        <Button
+          variant={choice === "do_nothing" ? "glass" : "outline"}
+          size="sm"
           onClick={() => setChoice("do_nothing")}
-          aria-pressed={choice === "do_nothing"}
-          className={cn(
-            "flex-1 border-l border-border-DEFAULT px-3 py-2 text-[12px] font-medium transition-colors focus:outline-none focus:ring-1 focus:ring-accent",
-            choice === "do_nothing"
-              ? "bg-bg-hover text-text-primary"
-              : "bg-bg-inset text-text-secondary hover:text-text-primary"
-          )}
+          className="text-xs font-medium text-text-secondary"
         >
-          Do nothing
-        </button>
+          Hold / Do Nothing
+        </Button>
       </div>
 
       {recommendedDoNothing && (
-        <p className="mt-2 text-[10px] text-degraded">
-          Correct call here is to do nothing — no real cause to intervene on. Execute disabled.
+        <p className="text-3xs text-status-degraded leading-snug">
+          Policy safety rule: confidence &lt; τ threshold. Execution is safely inhibited.
         </p>
       )}
 
@@ -97,68 +115,50 @@ export function RecoveryConsole({
         {choice === "execute" && (
           <motion.div
             key="x"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25 }}
-            className="mt-3 border-t border-border-subtle pt-3"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="rounded-xl border border-white/[0.08] bg-[#0A0C12] p-3 space-y-1"
           >
-            <div className="text-[10px] uppercase tracking-wide text-text-muted">measured outcome · counterfactual</div>
-            <div className={cn("tnum mt-0.5 text-2xl font-semibold", negative ? "text-down" : "text-healthy")}>
-              {inr(moneyRecovered)}
+            <div className="text-3xs uppercase font-semibold text-text-muted">
+              Measured Counterfactual Delta
             </div>
-            <p className="mt-1 text-[10px] text-text-muted">
+            <div
+              className={cn(
+                "font-mono text-xl font-bold tabular",
+                negative ? "text-status-down" : "text-status-healthy"
+              )}
+            >
+              <OdometerTicker value={inr(moneyRecovered)} />
+            </div>
+            <p className="text-3xs text-text-secondary leading-relaxed">
               {negative
-                ? "action reduced revenue vs holding — reported honestly, not clipped."
-                : "revenue vs holding, from re-running the same seed with the action applied."}
+                ? "Intervention reduced net revenue vs holding. Highlighted transparently."
+                : "Realized financial recovery achieved by routing around degraded dependency."}
             </p>
           </motion.div>
         )}
+
         {choice === "do_nothing" && (
           <motion.div
             key="d"
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25 }}
-            className="mt-3 border-t border-border-subtle pt-3"
+            initial={{ opacity: 0, y: -6 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -6 }}
+            className="rounded-xl border border-white/[0.08] bg-[#0A0C12] p-3 space-y-1"
           >
-            <div className="text-[10px] uppercase tracking-wide text-text-muted">safe default</div>
-            <div className="tnum mt-0.5 text-2xl font-semibold text-text-secondary">{inr(0)}</div>
-            <p className="mt-1 text-[10px] text-text-muted">
-              no intervention, no false-positive risk.
-              {recommendedDoNothing ? " correct here." : " forgoes the recovery above."}
+            <div className="text-3xs uppercase font-semibold text-text-muted">
+              Safe Default Standby
+            </div>
+            <div className="font-mono text-xl font-bold text-text-secondary tabular">
+              <OdometerTicker value={inr(0)} />
+            </div>
+            <p className="text-3xs text-text-secondary leading-relaxed">
+              Zero intervention risk executed. Preserved baseline routing parameters.
             </p>
           </motion.div>
         )}
       </AnimatePresence>
-    </div>
-  );
-}
-
-function Field({
-  label,
-  value,
-  tone,
-  mono,
-}: {
-  label: string;
-  value: string;
-  tone?: "healthy";
-  mono?: boolean;
-}) {
-  return (
-    <div>
-      <div className="text-[9px] uppercase tracking-wide text-text-muted">{label}</div>
-      <div
-        className={cn(
-          "truncate text-[12px] font-medium",
-          mono && "tabular",
-          tone === "healthy" ? "text-healthy" : "text-text-primary"
-        )}
-      >
-        {value}
-      </div>
     </div>
   );
 }
