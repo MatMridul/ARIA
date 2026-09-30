@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: aria-defense-engine
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: Dockerfile
+    healthCheckPath: /api/topology
+    envVars:
+      - key: PORT
+        value: 8000
