@@ -87,11 +87,13 @@ This document outlines the core engineering tradeoffs, failure modes, and edge c
 ## 2. Immediate Tonight Action Checklist
 
 - [x] **Document Edge Cases & Tradeoffs** (This file: `ARCHITECTURE_TRADEOFFS.md`).
-- [ ] **Implement Circuit Breaker State Machine** in `src/ariadne/`:
+- [x] **Implement Circuit Breaker State Machine** in `src/ariadne/decide/circuit_breaker.py`:
   - Three-state machine: `CLOSED` (normal), `OPEN` (degraded, traffic shunted), `HALF_OPEN` (probing canary traffic).
-  - Cooldown timers and failure count sliding windows.
-- [ ] **Add Idempotency Verification Test** in `tests/test_circuit_breaker.py`:
-  - Simulate an ambiguous gateway socket timeout and verify non-duplicate charge execution logic.
+  - Cooldown timers, failure count sliding windows, and hysteresis damping.
+- [x] **Add Idempotency & Ambiguous Timeout Router** in `src/ariadne/decide/idempotent_router.py`:
+  - Out-of-band inquiry to detect silent authorization success before rerouting.
+  - Strict Void-Before-Reroute handshake eliminating double-charge risks.
+  - Verified with 6 unit tests in `tests/test_idempotent_router.py` (85/85 total tests green).
 - [ ] **Prepare the 90-Second Interview Elevator Pitch**:
   - Focus on *why* set-theoretic rule synthesis was chosen over black-box deep learning (deterministic guarantees, regulator transparency, microsecond execution).
   - Articulate the 3 core production limitations (streaming ingestion, distributed consensus, cross-vault token portability).
