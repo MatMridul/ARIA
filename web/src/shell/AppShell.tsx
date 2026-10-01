@@ -2,7 +2,7 @@
  * Semantic nav grouping (CONTROL / SYSTEM / PROOF), compact run context, hairline
  * structure, global Command Palette, and interactive System Guide & Tour.
  */
-import { NavLink, Outlet } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { cn } from "@/design/ui";
 import { useAppStore } from "@/lib";
 import { useOperatorShortcuts } from "@/lib/useOperatorShortcuts";
@@ -72,8 +72,8 @@ export function AppShell() {
       <aside className="flex w-60 shrink-0 flex-col border-r border-white/[0.06] bg-[#07080C]/95 backdrop-blur-xl">
         {/* Brand Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-white/[0.06]">
-          <div className="flex items-center gap-2.5">
-            <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-accent/40 bg-accent/15 shadow-[0_0_12px_rgba(99,102,241,0.4)]">
+          <Link to="/" className="flex items-center gap-2.5 group hover:opacity-90 transition-opacity">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg border border-accent/40 bg-accent/15 shadow-[0_0_12px_rgba(99,102,241,0.4)] group-hover:border-accent/60 transition-colors">
               <Shield className="h-4 w-4 text-accent" />
             </div>
             <div className="leading-tight">
@@ -84,7 +84,7 @@ export function AppShell() {
                 Mission Control
               </div>
             </div>
-          </div>
+          </Link>
 
           <div className="flex items-center gap-1">
             <button

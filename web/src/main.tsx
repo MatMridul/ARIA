@@ -10,6 +10,7 @@ import { TopologyPage } from "@/pages/TopologyPage";
 import { IncidentsPage } from "@/pages/IncidentsPage";
 import { EvaluationPage } from "@/pages/EvaluationPage";
 import { AuditPage } from "@/pages/AuditPage";
+import { NotFoundPage } from "@/pages/NotFoundPage";
 
 const queryClient = new QueryClient();
 
@@ -24,6 +25,7 @@ const router = createBrowserRouter([
       { path: "incidents", element: <IncidentsPage /> },
       { path: "evaluation", element: <EvaluationPage /> },
       { path: "audit", element: <AuditPage /> },
+      { path: "*", element: <NotFoundPage /> },
     ],
   },
 ]);
