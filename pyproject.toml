@@ -17,5 +17,5 @@ reporting = ["matplotlib>=3.7"]
 where = ["src"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 testpaths = ["tests"]

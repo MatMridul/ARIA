@@ -10,6 +10,7 @@ Run (prod): build web/dist then `uvicorn web.api.main:app --host 127.0.0.1 --por
 from __future__ import annotations
 
 import os
+import time
 from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException
@@ -346,6 +347,111 @@ def post_topology_import(req: ImportRequest) -> dict:
         "shared_dependencies": norm.shared_banks,
         "note": "in-memory / request-scoped — not persisted",
     }
+
+
+# ---- Real-Time Telemetry Streaming & Ingestion ------------------------------
+from ariadne.observe.streaming_buffer import (
+    LiveEvaluationVerdict,
+    StreamingTelemetryBuffer,
+    TelemetryEvent,
+)
+
+streaming_buffer = StreamingTelemetryBuffer()
+
+
+class IngestEventModel(BaseModel):
+    transaction_id: str
+    amount: float = 100.0
+    method: Literal["card", "upi", "netbanking"] = "card"
+    psp_id: str
+    bank_id: str = "bank_A"
+    success: bool = True
+    latency_ms: float = 50.0
+    failure_code: Optional[str] = None
+    timestamp: Optional[float] = None
+    cohort: str = "live"
+    geography: str = "US"
+
+
+class IngestBatchRequest(BaseModel):
+    events: list[IngestEventModel]
+
+
+def _serialize_verdict(v: LiveEvaluationVerdict) -> dict:
+    return {
+        "timestamp": v.timestamp,
+        "total_events": v.total_events,
+        "window_duration_seconds": v.window_duration_seconds,
+        "overall_success_rate": v.overall_success_rate,
+        "detection": {
+            "triggered": v.detection.triggered,
+            "dropped_nodes": v.detection.dropped_nodes,
+            "window": v.detection.window,
+        },
+        "attribution": {
+            "root_cause_id": v.attribution.root_cause_id,
+            "root_cause_kind": v.attribution.root_cause_kind,
+            "confidence": round(v.attribution.confidence, 4),
+            "evidence_path": v.attribution.evidence_path,
+            "psp_causes": v.attribution.psp_causes,
+        },
+        "recommended_action": {
+            "kind": v.recommended_action.kind,
+            "params": v.recommended_action.params,
+            "decision_id": v.recommended_action.decision_id,
+            "confidence": round(v.recommended_action.confidence, 4),
+            "expected_recovery": round(v.recommended_action.expected_recovery, 2),
+            "evidence_path": v.recommended_action.evidence_path,
+        },
+        "circuit_states": v.circuit_states,
+        "node_stats": v.node_stats,
+    }
+
+
+@app.post("/api/telemetry/ingest")
+def post_telemetry_ingest(payload: dict) -> dict:
+    """Ingest a single transaction or a batch of live telemetry events.
+    Returns real-time anomaly detection, set-theoretic attribution, circuit breaker
+    states, and recommended routing action immediately."""
+    raw_events: list[dict] = payload.get("events", [payload]) if "events" in payload or "transaction_id" in payload else []
+    if not raw_events:
+        raise HTTPException(status_code=400, detail="Expected 'transaction_id' or 'events' array")
+
+    events: list[TelemetryEvent] = []
+    for item in raw_events:
+        events.append(
+            TelemetryEvent(
+                transaction_id=item["transaction_id"],
+                amount=float(item.get("amount", 100.0)),
+                method=item.get("method", "card"),
+                psp_id=item.get("psp_id", "psp_1"),
+                bank_id=item.get("bank_id", "bank_A"),
+                success=bool(item.get("success", True)),
+                latency_ms=float(item.get("latency_ms", 50.0)),
+                failure_code=item.get("failure_code"),
+                timestamp=float(item.get("timestamp", time.time())),
+                cohort=item.get("cohort", "live"),
+                geography=item.get("geography", "US"),
+            )
+        )
+
+    verdict = streaming_buffer.ingest_batch(events)
+    return {"status": "ok", "ingested_count": len(events), "verdict": _serialize_verdict(verdict)}
+
+
+@app.get("/api/telemetry/live")
+def get_telemetry_live() -> dict:
+    """Retrieve current sliding window verdict without ingesting new events."""
+    verdict = streaming_buffer.get_current_verdict()
+    return {"status": "ok", "verdict": _serialize_verdict(verdict)}
+
+
+@app.post("/api/telemetry/reset")
+def post_telemetry_reset() -> dict:
+    """Reset the live sliding window buffer and circuit breakers."""
+    streaming_buffer.reset()
+    return {"status": "ok", "message": "Live telemetry buffer and circuit breakers reset successfully."}
+
 
 
 # ---- static SPA mount (prod only; dev uses the Vite server) -------------------
