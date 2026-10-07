@@ -2,12 +2,13 @@
 
 **Adaptive Revenue Intelligence & Action** — an [ATLAS-class](https://github.com/MatMridul/ATLAS) system for payment revenue recovery.
 
-> **Status: Production-hardened, evaluated, and containerized.** The Shared Dependency
+> **Status: v0.3.0 Live Reference Implementation.** The Shared Dependency
 > Discrimination result and the recovery-vs-risk frontier are reproduced under
-> `reports/`. ARIA features a real-time telemetry streaming ingestion boundary,
+> `reports/`. ARIA features a real-time telemetry streaming ingestion boundary (SSE),
 > autonomous 3-state circuit breakers, an idempotent routing coordinator, and an
-> operator mission control console.
-> **89 automated tests pass** across core routing, attribution, and API ingestion.
+> operator mission control console deployed live at [https://aria-ionv.onrender.com](https://aria-ionv.onrender.com).
+> **90 automated tests pass** across core routing, attribution, and API ingestion.
+> See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the milestone progression and Definition of Done to `v1.0.0`.
 
 ---
 
@@ -216,7 +217,8 @@ visible.
 ## Governance
 
 Design decisions are recorded under [`docs/decisions/`](docs/decisions/) (two-pass
-Proposed→closed, immutable history). The build contract is in
+Proposed→closed, immutable history). The milestone progression and finish line definition
+are in [`docs/ROADMAP.md`](docs/ROADMAP.md); the build contract is in
 [`docs/BUILD_SPEC.md`](docs/BUILD_SPEC.md); the domain model in
 [`docs/adapter.md`](docs/adapter.md); scope tiers in [`docs/SCOPE.md`](docs/SCOPE.md).
 
