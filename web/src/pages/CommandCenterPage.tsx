@@ -11,7 +11,7 @@
 import * as React from "react";
 import { motion } from "framer-motion";
 import { cn, inr } from "@/design/ui";
-import { useAppStore, useSimulate, useTopology } from "@/lib";
+import { useAppStore, useLiveTelemetryStream, useSimulate, useTopology } from "@/lib";
 import { CommandTopology } from "@/topology";
 import { CommandHUD } from "@/components/hud/CommandHUD";
 import { ProofMatrix } from "@/components/telemetry/ProofMatrix";
@@ -30,6 +30,9 @@ export function CommandCenterPage() {
   const { scenario, customTopology, selectedWindow, viewLens } = useAppStore();
   const topo = useTopology();
   const sim = useSimulate(scenario, topo.isSuccess);
+
+  // Maintain live SSE connection when Live Mode is toggled
+  useLiveTelemetryStream();
 
   if (topo.isLoading || sim.isLoading) {
     return <LoadingState label="Initializing Cyber-Financial Mission Control Plane…" />;
