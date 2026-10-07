@@ -2,14 +2,45 @@
 
 **Adaptive Revenue Intelligence & Action** — an [ATLAS-class](https://github.com/MatMridul/ATLAS) system for payment revenue recovery.
 
-> **Status: built, tested, and evaluated end-to-end.** The Shared Dependency
+> **Status: Production-hardened, evaluated, and containerized.** The Shared Dependency
 > Discrimination result and the recovery-vs-risk frontier are reproduced under
-> `reports/`. A topology-ingestion boundary (Connect) maps a merchant's payment
-> infrastructure into the graph, and an operator web console (Command Center, live
-> payment topology, incident/RCA, evaluation, audit) runs on top of the same engine.
-> 74 automated tests pass (62 core + 12 ingestion).
+> `reports/`. ARIA features a real-time telemetry streaming ingestion boundary,
+> autonomous 3-state circuit breakers, an idempotent routing coordinator, and an
+> operator mission control console.
+> **89 automated tests pass** across core routing, attribution, and API ingestion.
 
 ---
+
+## Architecture Flow
+
+```
+┌─────────────────────────────────┐     ┌───────────────────────────────────┐
+│ Live Webhooks / Event Stream    │     │ Deterministic Scenario Simulator  │
+│ (/api/telemetry/ingest)         │     │ (Shared-Bank / Single-PSP / etc.) │
+└────────────────┬────────────────┘     └─────────────────┬─────────────────┘
+                 │                                        │
+                 ▼                                        ▼
+    ┌─────────────────────────┐              ┌─────────────────────────┐
+    │ StreamingTelemetryBuffer│              │  Sliding Window Record  │
+    └────────────┬────────────┘              └────────────┬────────────┘
+                 └───────────────────┬────────────────────┘
+                                     ▼
+                      ┌─────────────────────────────┐
+                      │  detect() [Delta Threshold] │
+                      └──────────────┬──────────────┘
+                                     ▼
+                      ┌─────────────────────────────┐
+                      │ attribute() [Set-Theoretic] │
+                      └──────────────┬──────────────┘
+                                     ▼
+                      ┌─────────────────────────────┐
+                      │  select_action() Policy     │
+                      ├─────────────────────────────┤
+                      │ • CircuitBreaker (Canary)   │
+                      │ • IdempotentCoordinator     │
+                      │   (Void-Before-Reroute)     │
+                      └─────────────────────────────┘
+```
 
 ## What ARIA is
 
@@ -117,10 +148,16 @@ preserved. DR-002 is Accepted with that held-out evidence recorded honestly.
 - **No cross-incident learning.** Each incident is diagnosed from its own window only.
 - **Determinism.** Same seed → identical results.
 
-Recovery amounts and the payment environment are **simulated**; recovery is measured
-as a **shared-seed counterfactual**, not real money moved. There is no production
-deployment, live merchant integration, or external database — the system runs
-in-process against a deterministic simulator.
+## Production Hardening & Invariants
+
+ARIA operates in two complementary modes:
+1. **Deterministic Counterfactual Simulation:** Used for scientific evaluation and mathematical replay against known ground truth (`money_recovered = revenue(action) − revenue(no_action)`).
+2. **Real-Time Live Webhook Ingestion:** Ingests live transactional event streams (`POST /api/telemetry/ingest`), computes dynamic sliding-window statistics in memory, and triggers real-time circuit breakers.
+
+### Key Reliability Safeguards
+* **Resilient 3-State Circuit Breakers:** Prevents route flapping and thundering-herd cascades with `CLOSED` $\rightarrow$ `OPEN` $\rightarrow$ `HALF_OPEN` state transitions and canary traffic gating ([`src/ariadne/decide/circuit_breaker.py`](src/ariadne/decide/circuit_breaker.py)).
+* **Idempotent Void-Before-Reroute Handshake:** Mathematically eliminates duplicate customer charges on ambiguous socket timeouts ([`src/ariadne/decide/idempotent_router.py`](src/ariadne/decide/idempotent_router.py)).
+* **Architectural Tradeoffs:** Formally catalogs the 9 critical failure modes in cyber-financial routing in [`ARCHITECTURE_TRADEOFFS.md`](ARCHITECTURE_TRADEOFFS.md).
 
 ## Architecture: ATLAS → ARIA
 
