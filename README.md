@@ -218,7 +218,8 @@ visible.
 
 Design decisions are recorded under [`docs/decisions/`](docs/decisions/) (two-pass
 Proposed→closed, immutable history). The milestone progression and finish line definition
-are in [`docs/ROADMAP.md`](docs/ROADMAP.md); the build contract is in
+are in [`docs/ROADMAP.md`](docs/ROADMAP.md); engineering version control standards are in
+[`docs/GIT_ETIQUETTE.md`](docs/GIT_ETIQUETTE.md); the build contract is in
 [`docs/BUILD_SPEC.md`](docs/BUILD_SPEC.md); the domain model in
 [`docs/adapter.md`](docs/adapter.md); scope tiers in [`docs/SCOPE.md`](docs/SCOPE.md).
 
