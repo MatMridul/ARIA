@@ -60,3 +60,14 @@ def test_api_telemetry_lifecycle():
     live_data = res.json()["verdict"]
     assert live_data["total_events"] == 13
     assert live_data["circuit_states"]["psp_1"] == "OPEN"
+
+
+def test_api_telemetry_stream_endpoint():
+    # Verify SSE endpoint connects and sends initial event stream
+    with client.stream("GET", "/api/telemetry/stream?limit=1") as response:
+        assert response.status_code == 200
+        assert "text/event-stream" in response.headers["content-type"]
+        lines = list(response.iter_lines())
+        data_lines = [l for l in lines if l and l.startswith("data: ")]
+        assert len(data_lines) >= 1
+        assert "verdict" in data_lines[0]

@@ -221,3 +221,44 @@ export interface ImportError {
   valid: false;
   errors: string[];
 }
+
+// ---- live telemetry ----------------------------------------------------------
+export const LiveVerdictSchema = z.object({
+  timestamp: z.number(),
+  total_events: z.number(),
+  window_duration_seconds: z.number(),
+  overall_success_rate: z.number(),
+  detection: z.object({
+    triggered: z.boolean(),
+    dropped_nodes: z.array(z.string()),
+    window: z.number(),
+  }),
+  attribution: z.object({
+    root_cause_id: z.string(),
+    root_cause_kind: z.string(),
+    confidence: z.number(),
+    evidence_path: z.array(z.string()),
+    psp_causes: z.array(z.string()).optional(),
+  }),
+  recommended_action: z.object({
+    kind: z.string(),
+    params: z.record(z.string(), z.any()),
+    decision_id: z.string(),
+    confidence: z.number(),
+    expected_recovery: z.number(),
+    evidence_path: z.array(z.string()),
+  }),
+  circuit_states: z.record(z.string(), z.string()),
+  node_stats: z.record(
+    z.string(),
+    z.object({
+      node_id: z.string(),
+      kind: z.string(),
+      success_rate: z.number(),
+      volume: z.number(),
+      avg_latency_ms: z.number(),
+      delta: z.number(),
+    })
+  ),
+});
+export type LiveVerdict = z.infer<typeof LiveVerdictSchema>;

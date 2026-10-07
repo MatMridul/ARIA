@@ -265,6 +265,10 @@ export function MethodNode({ data }: NodeProps) {
 // ---------------- PSP Node ----------------
 export function PspNode({ data }: NodeProps) {
   const d = data as PspNodeData;
+  const isLiveMode = useAppStore((s) => s.isLiveMode);
+  const liveVerdict = useAppStore((s) => s.liveVerdict);
+  const pspKey = (d.nodeId || d.label).toLowerCase().replace("-", "_");
+  const circuitState = isLiveMode ? liveVerdict?.circuit_states?.[pspKey] || "CLOSED" : null;
   const colors = HEALTH_COLORS[d.health];
   const idNum = d.label.replace(/\D/g, "");
   const sr = d.stat?.success_rate != null ? (d.stat.success_rate * 100).toFixed(1) + "%" : "100.0%";
@@ -318,6 +322,25 @@ export function PspNode({ data }: NodeProps) {
             </span>
           ) : null}
         </div>
+
+        {/* Dynamic Live Mode Circuit Breaker Badge */}
+        {circuitState && (
+          <div className="mt-1.5 pt-1.5 border-t border-white/[0.06] flex items-center justify-between text-[9px] font-mono">
+            <span className="text-text-muted">BREAKER</span>
+            <span
+              className={cn(
+                "px-1.5 py-0.2 rounded font-bold uppercase tracking-wider",
+                circuitState === "OPEN"
+                  ? "bg-status-down/20 text-status-down border border-status-down/40 animate-pulse"
+                  : circuitState === "HALF_OPEN"
+                  ? "bg-status-degraded/20 text-status-degraded border border-status-degraded/40"
+                  : "bg-status-healthy/15 text-status-healthy border border-status-healthy/30"
+              )}
+            >
+              {circuitState === "HALF_OPEN" ? "HALF-OPEN (10%)" : circuitState}
+            </span>
+          </div>
+        )}
       </div>
     </HardwareChip>
   );

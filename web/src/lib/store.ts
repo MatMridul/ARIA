@@ -4,7 +4,7 @@
  * executive vs. forensic lens, and guided help tour across all views.
  */
 import { create } from "zustand";
-import type { SimulateRequest, Topology } from "./schemas";
+import type { LiveVerdict, SimulateRequest, Topology } from "./schemas";
 
 export type ViewLens = "executive" | "forensic";
 export type MerchantProfileId = "ecommerce_retail" | "quick_commerce" | "travel_airlines" | "enterprise_saas";
@@ -83,6 +83,15 @@ export interface AppState {
   tourStep: number;
   viewLens: ViewLens;
 
+  // Live Telemetry Plane slice
+  isLiveMode: boolean;
+  liveVerdict: LiveVerdict | null;
+  liveStreamConnected: boolean;
+  liveDrawerOpen: boolean;
+  liveGeneratorActive: boolean;
+  liveGeneratorScenario: "healthy" | "psp_outage" | "bank_outage";
+  liveGeneratorTps: number;
+
   setScenario: (update: Partial<SimulateRequest>) => void;
   setCustomTopology: (topo: Topology | null) => void;
   setSelectedWindow: (window: number | ((prev: number) => number)) => void;
@@ -102,6 +111,13 @@ export interface AppState {
   setTourActive: (active: boolean) => void;
   setTourStep: (step: number) => void;
   setViewLens: (lens: ViewLens) => void;
+  setIsLiveMode: (isLive: boolean) => void;
+  setLiveVerdict: (verdict: LiveVerdict | null) => void;
+  setLiveStreamConnected: (connected: boolean) => void;
+  setLiveDrawerOpen: (open: boolean) => void;
+  setLiveGeneratorActive: (active: boolean) => void;
+  setLiveGeneratorScenario: (scenario: "healthy" | "psp_outage" | "bank_outage") => void;
+  setLiveGeneratorTps: (tps: number) => void;
   startTour: () => void;
   nextTourStep: () => void;
   prevTourStep: () => void;
@@ -135,6 +151,15 @@ export const useAppStore = create<AppState>((set) => ({
   tourStep: 0,
   viewLens: "forensic",
 
+  // Live Telemetry Defaults
+  isLiveMode: false,
+  liveVerdict: null,
+  liveStreamConnected: false,
+  liveDrawerOpen: false,
+  liveGeneratorActive: false,
+  liveGeneratorScenario: "psp_outage",
+  liveGeneratorTps: 15,
+
   setScenario: (update) =>
     set((state) => ({
       scenario: { ...state.scenario, ...update },
@@ -164,6 +189,13 @@ export const useAppStore = create<AppState>((set) => ({
   setTourActive: (tourActive) => set({ tourActive }),
   setTourStep: (tourStep) => set({ tourStep }),
   setViewLens: (viewLens) => set({ viewLens }),
+  setIsLiveMode: (isLiveMode) => set({ isLiveMode }),
+  setLiveVerdict: (liveVerdict) => set({ liveVerdict }),
+  setLiveStreamConnected: (liveStreamConnected) => set({ liveStreamConnected }),
+  setLiveDrawerOpen: (liveDrawerOpen) => set({ liveDrawerOpen }),
+  setLiveGeneratorActive: (liveGeneratorActive) => set({ liveGeneratorActive }),
+  setLiveGeneratorScenario: (liveGeneratorScenario) => set({ liveGeneratorScenario }),
+  setLiveGeneratorTps: (liveGeneratorTps) => set({ liveGeneratorTps }),
   startTour: () => set({ tourActive: true, tourStep: 0, helpDialogOpen: false, postMortemOpen: false, inspectorOpen: false, whatIfOpen: false }),
   nextTourStep: () => set((state) => ({ tourStep: state.tourStep + 1 })),
   prevTourStep: () => set((state) => ({ tourStep: Math.max(0, state.tourStep - 1) })),

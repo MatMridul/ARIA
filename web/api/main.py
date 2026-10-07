@@ -9,12 +9,15 @@ Run (prod): build web/dist then `uvicorn web.api.main:app --host 127.0.0.1 --por
 """
 from __future__ import annotations
 
+import asyncio
+import json
 import os
 import time
 from typing import Literal, Optional
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
 from ariadne.decide.actions import Action
@@ -408,6 +411,18 @@ def _serialize_verdict(v: LiveEvaluationVerdict) -> dict:
     }
 
 
+_stream_subscribers: list[asyncio.Queue] = []
+
+
+def _broadcast_telemetry_event(data: dict) -> None:
+    payload = json.dumps(data)
+    for q in list(_stream_subscribers):
+        try:
+            q.put_nowait(payload)
+        except asyncio.QueueFull:
+            pass
+
+
 @app.post("/api/telemetry/ingest")
 def post_telemetry_ingest(payload: dict) -> dict:
     """Ingest a single transaction or a batch of live telemetry events.
@@ -436,7 +451,9 @@ def post_telemetry_ingest(payload: dict) -> dict:
         )
 
     verdict = streaming_buffer.ingest_batch(events)
-    return {"status": "ok", "ingested_count": len(events), "verdict": _serialize_verdict(verdict)}
+    serialized = _serialize_verdict(verdict)
+    _broadcast_telemetry_event({"type": "verdict", "verdict": serialized, "batch_size": len(events)})
+    return {"status": "ok", "ingested_count": len(events), "verdict": serialized}
 
 
 @app.get("/api/telemetry/live")
@@ -450,7 +467,51 @@ def get_telemetry_live() -> dict:
 def post_telemetry_reset() -> dict:
     """Reset the live sliding window buffer and circuit breakers."""
     streaming_buffer.reset()
+    verdict = streaming_buffer.get_current_verdict()
+    serialized = _serialize_verdict(verdict)
+    _broadcast_telemetry_event({"type": "reset", "verdict": serialized})
     return {"status": "ok", "message": "Live telemetry buffer and circuit breakers reset successfully."}
+
+
+@app.get("/api/telemetry/stream")
+async def get_telemetry_stream(limit: int = 0):
+    """Server-Sent Events endpoint pushing live telemetry updates in real-time.
+    If limit > 0, closes connection after yielding `limit` events (useful for tests and health probes)."""
+    q: asyncio.Queue = asyncio.Queue(maxsize=100)
+    _stream_subscribers.append(q)
+
+    # Push current state immediately upon connection
+    current_verdict = _serialize_verdict(streaming_buffer.get_current_verdict())
+    await q.put(json.dumps({"type": "initial", "verdict": current_verdict}))
+
+    async def event_generator():
+        yielded = 0
+        try:
+            while True:
+                try:
+                    payload = await asyncio.wait_for(q.get(), timeout=2.5)
+                    yield f"data: {payload}\n\n"
+                    yielded += 1
+                    if limit > 0 and yielded >= limit:
+                        break
+                except asyncio.TimeoutError:
+                    # Keep-alive heartbeat comment every 2.5s
+                    yield ": heartbeat\n\n"
+        except asyncio.CancelledError:
+            pass
+        finally:
+            if q in _stream_subscribers:
+                _stream_subscribers.remove(q)
+
+    return StreamingResponse(
+        event_generator(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
 
 
