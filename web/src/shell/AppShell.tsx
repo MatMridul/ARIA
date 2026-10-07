@@ -11,6 +11,7 @@ import { SystemGuideDialog, GuidedTour } from "@/components/help";
 import { PostMortemDialog } from "@/components/verdict/PostMortemDialog";
 import { NodeInspectorDrawer } from "@/components/inspector/NodeInspectorDrawer";
 import { WhatIfModal } from "@/components/sandbox/WhatIfModal";
+import { LiveWebhookDrawer } from "@/components/telemetry/LiveWebhookDrawer";
 import {
   Activity,
   BarChart3,
@@ -68,6 +69,7 @@ export function AppShell() {
       <PostMortemDialog />
       <NodeInspectorDrawer />
       <WhatIfModal />
+      <LiveWebhookDrawer />
 
       <aside className="flex w-60 shrink-0 flex-col border-r border-white/[0.06] bg-[#07080C]/95 backdrop-blur-xl">
         {/* Brand Header */}
