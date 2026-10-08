@@ -10,6 +10,7 @@ Run (prod): build web/dist then `uvicorn web.api.main:app --host 127.0.0.1 --por
 from __future__ import annotations
 
 import asyncio
+from contextlib import asynccontextmanager
 import json
 import math
 import os
@@ -21,6 +22,13 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 
+from ariadne.chaos import (
+    ChaosConfig,
+    ChaosJournal,
+    ChaosMonkeyMiddleware,
+    WorkerSupervisor,
+    load_chaos_config,
+)
 from ariadne.security import (
     DEFAULT_WEBHOOK_SECRET,
     IdempotencyGuard,
@@ -38,7 +46,34 @@ from ariadne.model.graph import default_graph
 from ariadne.simulator.config import SimConfig
 from ariadne.simulator.incidents import IncidentType, make_incident
 
-app = FastAPI(title="ARIA API", version="1.0.0")
+# ---- Netflix Chaos Monkey & Simian Army State --------------------------------
+chaos_config = load_chaos_config()
+chaos_journal = ChaosJournal()
+worker_supervisor = WorkerSupervisor(config=chaos_config, journal=chaos_journal)
+
+# Register a supervised telemetry background worker
+async def _synthetic_worker_job():
+    while True:
+        await asyncio.sleep(5.0)
+
+worker_supervisor.register_worker("telemetry_heartbeat", _synthetic_worker_job)
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    worker_supervisor.start()
+    try:
+        yield
+    finally:
+        worker_supervisor.stop()
+
+app = FastAPI(title="ARIA API", version="1.0.0", lifespan=lifespan)
+
+# Add Chaos Monkey middleware (inner to CORS)
+app.add_middleware(
+    ChaosMonkeyMiddleware,
+    config=chaos_config,
+    journal=chaos_journal,
+)
 
 # CORS only matters in dev (Vite on :5173 -> API on :8000). In prod the SPA is
 # served same-origin by this app, so this is harmless either way.
@@ -613,6 +648,67 @@ async def get_telemetry_stream(
         },
     )
 
+
+# ---- Netflix Chaos Monkey & Simian Army Endpoints ----------------------------
+@app.get("/api/chaos/status")
+def get_chaos_status() -> dict:
+    """Inspect current Simian Army state, attack history, and supervisor status."""
+    return {
+        "status": "ok",
+        "config": chaos_config.to_dict(),
+        "summary": chaos_journal.get_summary(),
+        "history": chaos_journal.get_history(limit=25),
+        "supervisor": worker_supervisor.get_status(),
+    }
+
+
+class ChaosConfigUpdate(BaseModel):
+    enabled: Optional[bool] = None
+    fault_probability: Optional[float] = None
+    latency_probability: Optional[float] = None
+    worker_kill_probability: Optional[float] = None
+
+
+@app.post("/api/chaos/configure")
+def post_chaos_configure(update: ChaosConfigUpdate) -> dict:
+    """Dynamically reconfigure Simian Army probabilities or toggle chaos on/off."""
+    if update.enabled is not None:
+        chaos_config.enabled = update.enabled
+    if update.fault_probability is not None:
+        chaos_config.fault_monkey.probability = max(0.0, min(1.0, update.fault_probability))
+    if update.latency_probability is not None:
+        chaos_config.latency_monkey.probability = max(0.0, min(1.0, update.latency_probability))
+    if update.worker_kill_probability is not None:
+        chaos_config.worker_monkey.kill_probability = max(0.0, min(1.0, update.worker_kill_probability))
+    return {
+        "status": "ok",
+        "message": "Chaos configuration updated successfully.",
+        "config": chaos_config.to_dict(),
+    }
+
+
+@app.post("/api/chaos/reset")
+def post_chaos_reset() -> dict:
+    """Reset the Simian Army attack journal."""
+    chaos_journal.reset()
+    return {"status": "ok", "message": "Chaos journal reset successfully."}
+
+
+@app.post("/api/chaos/strike/worker")
+def post_chaos_strike_worker(name: Optional[str] = None) -> dict:
+    """Trigger an immediate Worker Monkey strike on a background task."""
+    if name:
+        struck = worker_supervisor.strike_worker(name)
+        target = name
+    else:
+        target = worker_supervisor.strike_random_worker()
+        struck = target is not None
+    return {
+        "status": "ok",
+        "struck": struck,
+        "target": target,
+        "supervisor": worker_supervisor.get_status(),
+    }
 
 
 # ---- static SPA mount (prod only; dev uses the Vite server) -------------------

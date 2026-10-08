@@ -1,0 +1,27 @@
+# ==============================================================================
+# Netflix Chaos Monkey Configuration (Simian Army Architecture)
+# Project: ARIA (Autonomous Resilience & Incident Attribution)
+# ==============================================================================
+
+[chaos]
+enabled = false             # Production safety: disabled by default
+working_hours_only = false  # If true, chaos only strikes during active business hours
+track_journal = true        # Maintain an in-memory audit ledger of all simian attacks
+
+[latency_monkey]
+enabled = true
+probability = 0.10          # 10% of HTTP traffic receives artificial delay
+min_delay_ms = 150
+max_delay_ms = 800
+
+[fault_monkey]
+enabled = true
+probability = 0.05          # 5% of HTTP traffic receives simulated upstream 503
+status_code = 503
+error_message = "[CHAOS MONKEY] Simulating transient upstream provider outage"
+
+[worker_monkey]
+enabled = true
+kill_probability = 0.20     # Probability of terminating an active background worker
+check_interval_seconds = 10 # Interval between reaper scans
+auto_recover = true         # Supervisor verifies instant recovery of terminated tasks
