@@ -2,12 +2,13 @@
 
 **Adaptive Revenue Intelligence & Action** — an [ATLAS-class](https://github.com/MatMridul/ATLAS) system for payment revenue recovery.
 
-> **Status: v0.3.0 Live Reference Implementation.** The Shared Dependency
+> **Status: v0.4.0 Ingestion Security & Streaming Reference.** The Shared Dependency
 > Discrimination result and the recovery-vs-risk frontier are reproduced under
-> `reports/`. ARIA features a real-time telemetry streaming ingestion boundary (SSE),
-> autonomous 3-state circuit breakers, an idempotent routing coordinator, and an
-> operator mission control console deployed live at [https://aria-ionv.onrender.com](https://aria-ionv.onrender.com).
-> **90 automated tests pass** across core routing, attribution, and API ingestion.
+> `reports/`. ARIA features a real-time telemetry streaming boundary (SSE),
+> cryptographic HMAC-SHA256 webhook perimeter authentication, sliding-window idempotency
+> replay protection, autonomous 3-state circuit breakers, and an operator mission control
+> console deployed live at [https://aria-ionv.onrender.com](https://aria-ionv.onrender.com).
+> **98 automated tests pass** across core routing, attribution, security, and API ingestion.
 > See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the milestone progression and Definition of Done to `v1.0.0`.
 
 ---
