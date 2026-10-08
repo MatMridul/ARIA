@@ -11,11 +11,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import math
 import os
 import time
 from typing import Literal, Optional
 
-from fastapi import FastAPI, Header, HTTPException, Request
+from fastapi import FastAPI, Header, HTTPException, Query, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -450,33 +451,75 @@ async def post_telemetry_ingest(
     secret = os.environ.get("ARIA_WEBHOOK_SECRET", DEFAULT_WEBHOOK_SECRET)
     enforce_signature = os.environ.get("ARIA_REQUIRE_SIGNATURE", "false").lower() in ("1", "true", "yes")
 
-    if x_aria_signature:
+    if x_aria_signature is not None:
+        if not x_aria_signature.strip():
+            raise HTTPException(status_code=401, detail="Empty X-Aria-Signature header provided")
         valid, reason = verify_signature(secret, body_bytes, x_aria_signature)
         if not valid:
             raise HTTPException(status_code=401, detail=f"Invalid webhook signature: {reason}")
     elif enforce_signature:
         raise HTTPException(status_code=401, detail="Missing required X-Aria-Signature header")
 
-    # 2. Extract raw events
-    raw_events: list[dict] = payload.get("events", [payload]) if "events" in payload or "transaction_id" in payload else []
+    # 2. Extract and validate raw events
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Expected JSON object at root")
+
+    raw_events_input = payload.get("events")
+    if raw_events_input is not None:
+        if not isinstance(raw_events_input, list):
+            raise HTTPException(status_code=400, detail="'events' field must be a list")
+        raw_events = raw_events_input
+    elif "transaction_id" in payload:
+        raw_events = [payload]
+    else:
+        raw_events = []
+
     if not raw_events:
-        raise HTTPException(status_code=400, detail="Expected 'transaction_id' or 'events' array")
+        raise HTTPException(status_code=400, detail="Expected non-empty 'transaction_id' or 'events' array")
 
     events: list[TelemetryEvent] = []
-    for item in raw_events:
+    for idx, item in enumerate(raw_events):
+        if not isinstance(item, dict):
+            raise HTTPException(status_code=400, detail=f"Event at index {idx} must be a JSON object")
+
+        tx_id = item.get("transaction_id")
+        if not tx_id:
+            raise HTTPException(status_code=400, detail=f"Event at index {idx} missing 'transaction_id'")
+
+        try:
+            amt = float(item.get("amount", 100.0))
+            if math.isnan(amt) or math.isinf(amt):
+                amt = 0.0
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail=f"Event '{tx_id}' has non-numeric 'amount'")
+
+        try:
+            lat = float(item.get("latency_ms", 50.0))
+            if math.isnan(lat) or math.isinf(lat):
+                lat = 50.0
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail=f"Event '{tx_id}' has non-numeric 'latency_ms'")
+
+        try:
+            ts = float(item.get("timestamp", time.time()))
+            if math.isnan(ts) or math.isinf(ts):
+                ts = time.time()
+        except (ValueError, TypeError):
+            raise HTTPException(status_code=400, detail=f"Event '{tx_id}' has non-numeric 'timestamp'")
+
         events.append(
             TelemetryEvent(
-                transaction_id=item["transaction_id"],
-                amount=float(item.get("amount", 100.0)),
-                method=item.get("method", "card"),
-                psp_id=item.get("psp_id", "psp_1"),
-                bank_id=item.get("bank_id", "bank_A"),
+                transaction_id=str(tx_id),
+                amount=amt,
+                method=str(item.get("method", "card") or "card"),
+                psp_id=str(item.get("psp_id", "psp_1") or "psp_1"),
+                bank_id=str(item.get("bank_id", "bank_A") or "bank_A"),
                 success=bool(item.get("success", True)),
-                latency_ms=float(item.get("latency_ms", 50.0)),
-                failure_code=item.get("failure_code"),
-                timestamp=float(item.get("timestamp", time.time())),
-                cohort=item.get("cohort", "live"),
-                geography=item.get("geography", "US"),
+                latency_ms=lat,
+                failure_code=str(item.get("failure_code")) if item.get("failure_code") is not None else None,
+                timestamp=ts,
+                cohort=str(item.get("cohort", "live") or "live"),
+                geography=str(item.get("geography", "US") or "US"),
             )
         )
 
@@ -529,7 +572,9 @@ def post_telemetry_reset() -> dict:
 
 
 @app.get("/api/telemetry/stream")
-async def get_telemetry_stream(limit: int = 0):
+async def get_telemetry_stream(
+    limit: int = Query(0, ge=0, le=50000, description="Max events to stream before closing. 0 for infinite stream.")
+):
     """Server-Sent Events endpoint pushing live telemetry updates in real-time.
     If limit > 0, closes connection after yielding `limit` events (useful for tests and health probes)."""
     q: asyncio.Queue = asyncio.Queue(maxsize=100)
