@@ -8,7 +8,7 @@
 > cryptographic HMAC-SHA256 webhook perimeter authentication, sliding-window idempotency
 > replay protection, autonomous 3-state circuit breakers, and an operator mission control
 > console deployed live at [https://aria-ionv.onrender.com](https://aria-ionv.onrender.com).
-> **98 automated tests pass** across core routing, attribution, security, and API ingestion.
+> **103 automated tests pass** across core routing, attribution, security, and API ingestion.
 > See [`docs/ROADMAP.md`](docs/ROADMAP.md) for the milestone progression and Definition of Done to `v1.0.0`.
 
 ---
