@@ -20,9 +20,30 @@ import {
   Play,
   RotateCcw,
   ShieldAlert,
+  ShieldCheck,
   Terminal,
   Zap,
 } from "lucide-react";
+
+async function computeHmacSha256(secret: string, message: string): Promise<string> {
+  try {
+    const enc = new TextEncoder();
+    const key = await window.crypto.subtle.importKey(
+      "raw",
+      enc.encode(secret),
+      { name: "HMAC", hash: "SHA-256" },
+      false,
+      ["sign"]
+    );
+    const signature = await window.crypto.subtle.sign("HMAC", key, enc.encode(message));
+    return Array.from(new Uint8Array(signature))
+      .map((b) => b.toString(16).padStart(2, "0"))
+      .join("");
+  } catch (e) {
+    console.warn("WebCrypto HMAC unavailable, falling back:", e);
+    return "browser_sig_fallback";
+  }
+}
 
 export function LiveWebhookDrawer() {
   const {
@@ -95,10 +116,18 @@ export function LiveWebhookDrawer() {
       }
 
       try {
+        const ts = Math.floor(Date.now() / 1000);
+        const bodyString = JSON.stringify({ events });
+        const sig = await computeHmacSha256("whsec_aria_reference_secret_default", `${ts}.${bodyString}`);
+        const sigHeader = `t=${ts},v1=${sig}`;
+
         await fetch("/api/telemetry/ingest", {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ events }),
+          headers: {
+            "Content-Type": "application/json",
+            "X-Aria-Signature": sigHeader,
+          },
+          body: bodyString,
         });
       } catch (err) {
         console.error("Live generator ingest failed:", err);
@@ -116,18 +145,14 @@ export function LiveWebhookDrawer() {
     }
   };
 
-  const curlSnippet = `curl -X POST https://aria-ionv.onrender.com/api/telemetry/ingest \\
+  const curlSnippet = `# 1. Use the Python signing CLI:
+python scripts/send_webhook.py --scenario bank_outage --count 20
+
+# 2. Or post via signed cURL:
+curl -X POST https://aria-ionv.onrender.com/api/telemetry/ingest \\
   -H "Content-Type: application/json" \\
-  -d '{
-    "transaction_id": "tx_live_7891",
-    "amount": 149.50,
-    "method": "card",
-    "psp_id": "psp_1",
-    "bank_id": "bank_A",
-    "success": false,
-    "failure_code": "GATEWAY_TIMEOUT",
-    "latency_ms": 4500.0
-  }'`;
+  -H "X-Aria-Signature: t=1791421500,v1=9c4a7e..." \\
+  -d '{"transaction_id": "tx_live_7891", "amount": 149.50, "psp_id": "psp_1", "bank_id": "bank_A", "success": false}'`;
 
   const copyToClipboard = () => {
     navigator.clipboard.writeText(curlSnippet);
@@ -157,6 +182,13 @@ export function LiveWebhookDrawer() {
                     )}
                   >
                     {liveStreamConnected ? "SSE CONNECTED" : "AWAITING STREAM"}
+                  </Badge>
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] font-mono border-cyan-500/40 bg-cyan-500/10 text-cyan-400 flex items-center gap-1"
+                  >
+                    <ShieldCheck className="h-3 w-3" />
+                    HMAC-SHA256 SIGNED
                   </Badge>
                 </DialogTitle>
                 <DialogDescription className="text-2xs text-text-muted">

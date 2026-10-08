@@ -144,5 +144,6 @@ same reasons → same DR, noted in Consequences.
 | 001  | ARIADNE core design: graph size, attribution scoring, acting baseline | Accepted |
 | 002  | Attribution branch disambiguation (shared-dep / independent-PSP / method) | Accepted |
 | 003  | Live telemetry streaming plane and real-time breaker projection | Accepted |
+| 004  | Cryptographic webhook authentication and sliding-window idempotency | Accepted |
 
 _Update this table whenever a DR is added or its status changes._

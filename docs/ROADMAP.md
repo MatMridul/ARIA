@@ -23,11 +23,11 @@ Treating this project as a perpetual open-source effort invites endless maintena
     │
 [ v0.2.0 ]  Mission Control Cockpit & FastAPI Gateway   ──► DONE
     │
-[ v0.3.0 ]  Live Telemetry Plane & Render Deployment    ──► CURRENT (PR #1)
+[ v0.3.0 ]  Live Telemetry Plane & Render Deployment    ──► DONE (PR #2)
     │
-[ v0.4.0 ]  Ingestion Security, HMAC & Idempotency      ──► TARGET (Next Sprint)
+[ v0.4.0 ]  Ingestion Security, HMAC & Idempotency      ──► COMPLETED (PR #3)
     │
-[ v0.5.0 ]  Crash-Resilient Audit Ledger (SQLite)       ──► TARGET (Persistence)
+[ v0.5.0 ]  Crash-Resilient Audit Ledger (SQLite)       ──► NEXT (Persistence)
     │
 [ v1.0.0 ]  THE FINISH LINE — Frozen Reference Arch    ──► PERMANENT COMPLETION
 ```
@@ -75,18 +75,19 @@ Treating this project as a perpetual open-source effort invites endless maintena
 
 ---
 
-### `v0.4.0` — Ingestion Security, Webhook HMAC & Idempotency Boundary *(NEXT)*
+### `v0.4.0` — Ingestion Security, Webhook HMAC & Idempotency Boundary *(COMPLETED)*
 * **Focus:** Hardening the public webhook boundary against replay attacks and spoofed telemetry.
-* **Target Deliverables:**
+* **Shipped Deliverables:**
   1. **HMAC-SHA256 Signature Verification:**
-     * Ingestion dependency validating `X-Aria-Signature` (mirroring Stripe/Adyen webhook authentication).
-     * Rejection of unauthenticated or tampered payloads at the network perimeter.
+     * Ingestion dependency validating `X-Aria-Signature: t=<timestamp>,v1=<signature>` (mirroring Stripe/Adyen webhook authentication).
+     * Rejection of unauthenticated, tampered, or expired payloads (clock skew tolerance 300s) at the network perimeter.
   2. **Idempotency Key Tracking:**
-     * Sliding-window deduplication guard for incoming transaction/webhook event IDs to reject duplicate network retries.
-  3. **Realistic Webhook Ingestion Schema:**
-     * Support standard payload structures for payment failures, timeouts, and success webhooks.
-  4. **Signed CLI Test Harness (`scripts/send_webhook.py`):**
-     * Lightweight developer tool to sign and fire realistic webhook traffic bursts into the live deployment.
+     * Sliding-window deduplication guard (`IdempotencyGuard`) for incoming transaction/webhook event IDs to reject duplicate network retries without distorting attribution statistics.
+  3. **Signed CLI Test Harness (`scripts/send_webhook.py`):**
+     * Standalone developer CLI tool to sign and fire realistic webhook traffic bursts (healthy, PSP outage, bank outage) with `--tamper` and `--replay` testing flags.
+  4. **Web Crypto Browser Ingestion:**
+     * In-browser live generator signs telemetry batches using native `window.crypto.subtle`.
+* **Architectural Decisions:** [`DR-004`](decisions/DR-004-webhook-security-idempotency.md).
 * **Resume Signal:** Production payment security standards, cryptographic payload authentication, replay prevention, and idempotency guarantees.
 
 ---
