@@ -15,10 +15,16 @@ import os
 import time
 from typing import Literal, Optional
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
+
+from ariadne.security import (
+    DEFAULT_WEBHOOK_SECRET,
+    IdempotencyGuard,
+    verify_signature,
+)
 
 from ariadne.decide.actions import Action
 from ariadne.decide.policy import select_action
@@ -412,6 +418,7 @@ def _serialize_verdict(v: LiveEvaluationVerdict) -> dict:
 
 
 _stream_subscribers: list[asyncio.Queue] = []
+idempotency_guard = IdempotencyGuard(capacity=20000, ttl_seconds=600.0)
 
 
 def _broadcast_telemetry_event(data: dict) -> None:
@@ -424,10 +431,33 @@ def _broadcast_telemetry_event(data: dict) -> None:
 
 
 @app.post("/api/telemetry/ingest")
-def post_telemetry_ingest(payload: dict) -> dict:
+async def post_telemetry_ingest(
+    request: Request,
+    x_aria_signature: Optional[str] = Header(None, alias="X-Aria-Signature"),
+) -> dict:
     """Ingest a single transaction or a batch of live telemetry events.
+    Verifies cryptographic HMAC-SHA256 signature when provided or enforced.
+    Deduplicates events via sliding-window idempotency guard.
     Returns real-time anomaly detection, set-theoretic attribution, circuit breaker
     states, and recommended routing action immediately."""
+    body_bytes = await request.body()
+    try:
+        payload = json.loads(body_bytes.decode("utf-8")) if body_bytes else {}
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid JSON body")
+
+    # 1. Cryptographic HMAC Signature Verification
+    secret = os.environ.get("ARIA_WEBHOOK_SECRET", DEFAULT_WEBHOOK_SECRET)
+    enforce_signature = os.environ.get("ARIA_REQUIRE_SIGNATURE", "false").lower() in ("1", "true", "yes")
+
+    if x_aria_signature:
+        valid, reason = verify_signature(secret, body_bytes, x_aria_signature)
+        if not valid:
+            raise HTTPException(status_code=401, detail=f"Invalid webhook signature: {reason}")
+    elif enforce_signature:
+        raise HTTPException(status_code=401, detail="Missing required X-Aria-Signature header")
+
+    # 2. Extract raw events
     raw_events: list[dict] = payload.get("events", [payload]) if "events" in payload or "transaction_id" in payload else []
     if not raw_events:
         raise HTTPException(status_code=400, detail="Expected 'transaction_id' or 'events' array")
@@ -450,10 +480,34 @@ def post_telemetry_ingest(payload: dict) -> dict:
             )
         )
 
-    verdict = streaming_buffer.ingest_batch(events)
+    # 3. Sliding-Window Idempotency Deduplication
+    unique_events, duplicate_events = idempotency_guard.filter_events(events)
+
+    if not unique_events:
+        verdict = streaming_buffer.get_current_verdict()
+        serialized = _serialize_verdict(verdict)
+        return {
+            "status": "ok",
+            "ingested_count": 0,
+            "duplicate_count": len(duplicate_events),
+            "message": "All events were duplicate and ignored.",
+            "verdict": serialized,
+        }
+
+    verdict = streaming_buffer.ingest_batch(unique_events)
     serialized = _serialize_verdict(verdict)
-    _broadcast_telemetry_event({"type": "verdict", "verdict": serialized, "batch_size": len(events)})
-    return {"status": "ok", "ingested_count": len(events), "verdict": serialized}
+    _broadcast_telemetry_event({
+        "type": "verdict",
+        "verdict": serialized,
+        "batch_size": len(unique_events),
+        "duplicates_dropped": len(duplicate_events),
+    })
+    return {
+        "status": "ok",
+        "ingested_count": len(unique_events),
+        "duplicate_count": len(duplicate_events),
+        "verdict": serialized,
+    }
 
 
 @app.get("/api/telemetry/live")
@@ -465,8 +519,9 @@ def get_telemetry_live() -> dict:
 
 @app.post("/api/telemetry/reset")
 def post_telemetry_reset() -> dict:
-    """Reset the live sliding window buffer and circuit breakers."""
+    """Reset the live sliding window buffer, circuit breakers, and idempotency store."""
     streaming_buffer.reset()
+    idempotency_guard.reset()
     verdict = streaming_buffer.get_current_verdict()
     serialized = _serialize_verdict(verdict)
     _broadcast_telemetry_event({"type": "reset", "verdict": serialized})
